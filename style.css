@@ -1013,6 +1013,7 @@ body {
   fill: none;
   stroke: var(--color-secondary);
   stroke-width: 4;
+  display: none;
 }
 
 .timer-circle-progress {
