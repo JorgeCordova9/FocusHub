@@ -1,3 +1,10 @@
+// ===== AUTHENTICATION STATE =====
+let authState = {
+  isLoggedIn: false,
+  userId: null,
+  email: null,
+};
+
 // UI State
 let uiState = {
   sidebarOpen: true,
@@ -87,18 +94,61 @@ const motivationalMessages = [
 
 // Initialize App
 window.addEventListener("DOMContentLoaded", () => {
+  // Check authentication first
+  checkAuthenticationStatus();
+});
+
+// Check if user is authenticated
+async function checkAuthenticationStatus() {
+  try {
+    const response = await fetch("/api/auth/check", {
+      credentials: "include",
+    });
+    const data = await response.json();
+
+    if (data.authenticated) {
+      authState.isLoggedIn = true;
+      authState.userId = data.userId;
+      authState.email = data.email;
+      initializeApp();
+    } else {
+      // Allow anonymous mode - initialize app without authentication
+      authState.isLoggedIn = false;
+      initializeApp();
+    }
+  } catch (error) {
+    console.error("Auth check failed:", error);
+    // Allow anonymous mode on error
+    authState.isLoggedIn = false;
+    initializeApp();
+  }
+}
+
+// Initialize App after authentication
+function initializeApp() {
   initializeTheme();
   initializeWhiteboard();
   updateFocusStats();
   updateTopTimerDisplay();
-  renderTaskDashboard();
+  // Load tasks from server or from local storage for anonymous users
+  loadTasksDependingOnAuth();
+
+  // If authenticated, offer to sync any local tasks created while anonymous
+  if (authState.isLoggedIn) {
+    setTimeout(() => {
+      syncLocalToServerIfNeeded();
+    }, 800);
+  }
 
   // Start on task dashboard (no browser visible)
   switchModule("tasks");
 
   // Show welcome modal
   document.getElementById("welcomeModal").style.display = "flex";
-});
+
+  // Update user info in UI
+  updateUserDisplay();
+}
 
 // Logo Click Handler - Always return to home/dashboard
 function logoClickHandler() {
@@ -133,6 +183,54 @@ function logoClickHandler() {
   // Update timer display
   updateTopTimerDisplay();
   updateTaskTimerControls();
+}
+
+// Update user display in UI
+function updateUserDisplay() {
+  const userDisplay = document.querySelector(".app-title");
+  const loginBtn = document.getElementById("loginBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  if (loginBtn && logoutBtn) {
+    if (authState.isLoggedIn) {
+      loginBtn.style.display = "none";
+      logoutBtn.style.display = "block";
+    } else {
+      loginBtn.style.display = "block";
+      logoutBtn.style.display = "none";
+    }
+  }
+
+  if (userDisplay && authState.email) {
+    userDisplay.title = `Logged in as: ${authState.email}`;
+  }
+}
+
+// Logout function
+async function logout() {
+  try {
+    const response = await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "include",
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      authState.isLoggedIn = false;
+      authState.userId = null;
+      authState.email = null;
+      // Stay on the main page but switch to anonymous mode
+      loadTasksDependingOnAuth();
+      showNotification("✓ Logged out");
+    }
+  } catch (error) {
+    console.error("Logout error:", error);
+    // On error, still switch to anonymous mode
+    authState.isLoggedIn = false;
+    authState.userId = null;
+    authState.email = null;
+    loadTasksDependingOnAuth();
+  }
 }
 
 // Sidebar Toggle
@@ -581,11 +679,44 @@ function completeTaskTimer(task) {
   appData.dailyGoal.completedMinutes += Math.floor(task.timeSpent);
   updateDailyGoalDisplay();
 
+  // Sync with server
+  updateTaskOnServer(task);
+
   // Show completion modal with options
   showTaskCompletionModal(task);
 
   updateTopTimerDisplay();
   updateTaskTimerControls();
+}
+
+// Sync task changes to server
+async function updateTaskOnServer(task) {
+  // If user is anonymous, just persist locally
+  if (!authState.isLoggedIn) {
+    saveLocalTasks();
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/tasks/${task.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        nombre: task.name || task.nombre,
+        timeAllocated: task.timeAllocated,
+        timeSpent: task.timeSpent,
+        status: task.status,
+      }),
+    });
+
+    const data = await response.json();
+    if (!data.success) {
+      console.error("Error syncing task:", data.message);
+    }
+  } catch (error) {
+    console.error("Error updating task on server:", error);
+  }
 }
 
 function showTaskCompletionModal(task) {
@@ -1977,36 +2108,197 @@ function closeCreateTaskForm() {
   document.getElementById("createTaskModal").style.display = "none";
 }
 
-function createTask() {
+// ===== SERVER SYNC FUNCTIONS =====
+
+// Load tasks from server
+async function loadTasksFromServer() {
+  try {
+    const response = await fetch("/api/tasks", {
+      credentials: "include",
+    });
+    const data = await response.json();
+
+    if (data.success) {
+      appData.tasks = data.tasks || [];
+      renderTaskDashboard();
+    } else {
+      console.error("Failed to load tasks:", data.message);
+    }
+  } catch (error) {
+    console.error("Error loading tasks from server:", error);
+  }
+}
+
+// Decide where to load tasks based on auth state
+function loadTasksDependingOnAuth() {
+  if (authState.isLoggedIn) {
+    hideAnonymousBanner();
+    loadTasksFromServer();
+  } else {
+    // Anonymous: load from localStorage and show warning
+    loadLocalTasks();
+    showAnonymousBanner();
+  }
+}
+
+function loadLocalTasks() {
+  try {
+    const raw = localStorage.getItem("focushub_tasks_v1");
+    if (!raw) {
+      appData.tasks = [];
+      renderTaskDashboard();
+      return;
+    }
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      appData.tasks = parsed;
+    } else {
+      appData.tasks = [];
+    }
+    renderTaskDashboard();
+  } catch (e) {
+    console.error("Error loading local tasks:", e);
+    appData.tasks = [];
+    renderTaskDashboard();
+  }
+}
+
+function saveLocalTasks() {
+  try {
+    localStorage.setItem("focushub_tasks_v1", JSON.stringify(appData.tasks));
+  } catch (e) {
+    console.error("Error saving local tasks:", e);
+  }
+}
+
+function showAnonymousBanner() {
+  let banner = document.getElementById("anonWarning");
+  if (!banner) return;
+  banner.style.display = "flex";
+}
+
+function hideAnonymousBanner() {
+  let banner = document.getElementById("anonWarning");
+  if (!banner) return;
+  banner.style.display = "none";
+}
+
+// If user logs in and has local tasks, offer to upload them to the server
+async function syncLocalToServerIfNeeded() {
+  try {
+    const raw = localStorage.getItem("focushub_tasks_v1");
+    if (!raw) return;
+    const localTasks = JSON.parse(raw);
+    if (!Array.isArray(localTasks) || localTasks.length === 0) return;
+
+    if (
+      !confirm(
+        `Se detectaron ${localTasks.length} tareas creadas sin registrar.\n¿Deseas subirlas a tu cuenta ahora?`
+      )
+    ) {
+      return;
+    }
+
+    for (const lt of localTasks) {
+      try {
+        await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            nombre: lt.nombre || lt.name,
+            timeAllocated: lt.timeAllocated || lt.timeAllocated,
+          }),
+        });
+      } catch (e) {
+        console.error("Error uploading local task:", e);
+      }
+    }
+
+    // Clear local tasks after attempting upload and reload from server
+    localStorage.removeItem("focushub_tasks_v1");
+    showNotification(
+      "Tareas locales subidas. Recargando tareas del servidor..."
+    );
+    await loadTasksFromServer();
+  } catch (e) {
+    console.error("Error syncing local tasks:", e);
+  }
+}
+
+// Create task and save to server
+async function createTask() {
   const name = document.getElementById("newTaskName").value.trim();
   const timeAllocation = parseInt(document.getElementById("newTaskTime").value);
 
   if (!name) {
-    alert("Please enter a task name");
+    alert("Por favor ingresa un nombre de tarea");
     return;
   }
 
   if (!timeAllocation || timeAllocation < 1) {
-    alert("Please enter a valid time allocation (minimum 1 minute)");
+    alert("Por favor ingresa un tiempo válido (mínimo 1 minuto)");
     return;
   }
 
-  const task = {
-    id: Date.now(),
-    name: name,
-    timeAllocated: timeAllocation,
-    timeSpent: 0,
-    status: "pending",
-    notes: [],
-    diagrams: [],
-    currentNote: null,
-    createdAt: new Date().toISOString(),
-  };
+  try {
+    if (authState.isLoggedIn) {
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ nombre: name, timeAllocated }),
+      });
 
-  appData.tasks.push(task);
-  closeCreateTaskForm();
-  renderTaskDashboard();
-  showNotification("Task created successfully!");
+      const data = await response.json();
+
+      if (data.success) {
+        // Add to local appData
+        const task = {
+          id: data.taskId,
+          nombre: name,
+          timeAllocated: timeAllocation,
+          timeSpent: 0,
+          status: "pending",
+          notes: [],
+          diagrams: [],
+          currentNote: null,
+          created_at: new Date().toISOString(),
+        };
+
+        appData.tasks.push(task);
+        closeCreateTaskForm();
+        renderTaskDashboard();
+        showNotification("✓ Tarea creada exitosamente!");
+      } else {
+        alert("Error: " + data.message);
+      }
+    } else {
+      // Anonymous user: store locally
+      const task = {
+        id: Date.now(),
+        nombre: name,
+        timeAllocated: timeAllocation,
+        timeSpent: 0,
+        status: "pending",
+        notes: [],
+        diagrams: [],
+        currentNote: null,
+        created_at: new Date().toISOString(),
+      };
+
+      appData.tasks.push(task);
+      saveLocalTasks();
+      closeCreateTaskForm();
+      renderTaskDashboard();
+      showNotification(
+        "✓ Tarea creada (guardada localmente). Regístrate para persistirla en la nube."
+      );
+    }
+  } catch (error) {
+    console.error("Error creating task:", error);
+    alert("Error al crear la tarea");
+  }
 }
 
 function renderTaskDashboard() {
@@ -2171,10 +2463,41 @@ function attachDragListeners() {
 }
 
 function deleteTask(id) {
-  if (confirm("Delete this task? All notes and diagrams will be lost.")) {
-    appData.tasks = appData.tasks.filter((t) => t.id !== id);
-    renderTaskDashboard();
-    showNotification("Task deleted");
+  if (
+    confirm("¿Eliminar esta tarea? Se perderán todas las notas y diagramas.")
+  ) {
+    if (authState.isLoggedIn) {
+      deleteTaskFromServer(id);
+    } else {
+      // Anonymous - delete locally
+      appData.tasks = appData.tasks.filter((t) => t.id !== id);
+      saveLocalTasks();
+      renderTaskDashboard();
+      showNotification("✓ Tarea eliminada (localmente)");
+    }
+  }
+}
+
+// Delete task from server
+async function deleteTaskFromServer(taskId) {
+  try {
+    const response = await fetch(`/api/tasks/${taskId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      appData.tasks = appData.tasks.filter((t) => t.id !== taskId);
+      renderTaskDashboard();
+      showNotification("✓ Tarea eliminada");
+    } else {
+      alert("Error: " + data.message);
+    }
+  } catch (error) {
+    console.error("Error deleting task:", error);
+    alert("Error al eliminar la tarea");
   }
 }
 

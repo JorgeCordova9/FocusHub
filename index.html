@@ -1,522 +1,1170 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FocusHub - Study Companion</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <!-- Top Bar -->
-  <div class="top-bar">
-    <div class="top-bar-left">
-      <h1 class="app-title" onclick="logoClickHandler()" title="Click to return to dashboard">FocusHub</h1>
-      <span class="current-task" id="currentTaskDisplay">Task Dashboard</span>
-    </div>
-    
-    <div class="top-bar-right">
-      <!-- Theme Toggle -->
-      <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
-        🌙
-      </button>
-      
-      <!-- Timer Display -->
-      <div class="timer-display" style="display: flex; align-items: center; gap: var(--space-16);">
-        <div class="timer-circle" style="cursor: default;" title="Timer inactive" id="timerCircle">
-          <svg width="60" height="60">
-            <circle class="timer-circle-bg" cx="30" cy="30" r="26"></circle>
-            <circle id="timerProgress" class="timer-circle-progress" cx="30" cy="30" r="26"></circle>
-          </svg>
-          <div class="timer-text" id="timerText">25:00</div>
-        </div>
-        <div class="timer-info">
-          <div class="timer-phase" id="timerPhase">Ready</div>
-          <div class="timer-rounds" id="timerRounds"></div>
-        </div>
-        
-        <!-- Task Timer Controls (shown only when in task workspace) -->
-        <div class="timer-controls hidden" id="taskTimerControls">
-          <button class="timer-control-btn pause" id="taskPauseBtn" onclick="pauseOrResumeTaskTimer()" title="Pause/Resume timer">
-            ⏸ Pause
-          </button>
-          <button class="timer-control-btn stop" onclick="stopTaskTimerEarly()" title="Stop and exit without completing">
-            ⏹ Stop
-          </button>
-          <button class="timer-control-btn finish" onclick="finishTaskEarly()" title="Finish task and mark as complete">
-            ✓ Finish Task
-          </button>
-        </div>
-      </div>
-      
-      <!-- Timer Customization Panel -->
-      <div id="timerPanel" class="timer-panel" style="display: none;">
-        <div class="timer-panel-header">
-          <h3>⚙️ Pomodoro Timer</h3>
-          <button class="timer-panel-close" onclick="toggleTimerPanel()">×</button>
-        </div>
-        
-        <div class="timer-panel-body">
-          <div class="slider-group">
-            <label class="slider-label">
-              <span>Work Time:</span>
-              <span id="workTimeValue" class="slider-value">25 min</span>
-            </label>
-            <input type="range" id="workTimeSlider" class="custom-slider" min="1" max="120" value="25" oninput="updateSliderValue('workTime', this.value)">
-          </div>
-
-          <div class="slider-group">
-            <label class="slider-label">
-              <span>Break Time:</span>
-              <span id="breakTimeValue" class="slider-value">5 min</span>
-            </label>
-            <input type="range" id="breakTimeSlider" class="custom-slider" min="1" max="60" value="5" oninput="updateSliderValue('breakTime', this.value)">
-          </div>
-
-          <div class="slider-group">
-            <label class="slider-label">
-              <span>Rounds:</span>
-              <span id="roundsValue" class="slider-value">5 rounds</span>
-            </label>
-            <input type="range" id="roundsSlider" class="custom-slider" min="1" max="20" value="5" oninput="updateSliderValue('rounds', this.value)">
-          </div>
-          
-          <div class="timer-panel-actions">
-            <button class="btn btn--primary" style="width: 100%;" onclick="startPomodoroFromPanel()" id="startPomodoroBtn">▶ Start</button>
-            <div style="display: flex; gap: 8px; margin-top: 8px;" id="runningControls" style="display: none;">
-              <button class="btn btn--secondary" style="flex: 1;" onclick="pausePomodoroTimer()" id="pauseBtn">⏸ Pause</button>
-              <button class="btn btn--secondary" style="flex: 1;" onclick="stopPomodoroSession()">⏹ Stop</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Focus Stats -->
-      <div class="focus-stats">
-        <div class="stat-item">
-          <span class="stat-label">Sessions</span>
-          <span class="stat-value" id="sessionsToday">0</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-label">Streak</span>
-          <span class="stat-value" id="currentStreak">0</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Main Container -->
-  <div class="main-container">
-    <!-- Floating Hamburger Button (shown when sidebar is collapsed) -->
-    <button class="hamburger-btn-floating" onclick="toggleSidebar()" title="Open Menu">☰</button>
-    
-    <!-- Sidebar - Task Dashboard Mode -->
-    <div class="sidebar" id="dashboardSidebar">
-      <!-- Hamburger Menu in Sidebar Header -->
-      <div class="sidebar-header">
-        <button class="hamburger-btn" onclick="toggleSidebar()" title="Toggle Menu">☰</button>
-      </div>
-      
-      <button class="nav-btn active" onclick="switchModule('tasks')">
-        <span class="nav-icon">📋</span>
-        <span>Tasks</span>
-      </button>
-      <button class="nav-btn" onclick="switchModule('music')">
-        <span class="nav-icon">🎵</span>
-        <span>Music</span>
-      </button>
-      <div style="padding: var(--space-16); margin-top: auto; border-top: 1px solid var(--color-card-border);">
-        <button class="btn btn--primary" style="width: 100%;" onclick="showCreateTaskForm()">+ New Task</button>
-      </div>
-    </div>
-    
-    <!-- Sidebar - Task Workspace Mode -->
-    <div class="sidebar" id="workspaceSidebar" style="display: none;">
-      <!-- Hamburger Menu in Sidebar Header -->
-      <div class="sidebar-header">
-        <button class="hamburger-btn" onclick="toggleSidebar()" title="Toggle Menu">☰</button>
-      </div>
-      
-      <button class="nav-btn" onclick="switchTaskModule('browser')">
-        <span class="nav-icon">🌐</span>
-        <span>Browser</span>
-      </button>
-      <button class="nav-btn" onclick="switchTaskModule('notes')">
-        <span class="nav-icon">📝</span>
-        <span>Notes</span>
-      </button>
-      <button class="nav-btn" onclick="switchTaskModule('whiteboard')">
-        <span class="nav-icon">🎨</span>
-        <span>Whiteboard</span>
-      </button>
-      <button class="nav-btn" onclick="switchTaskModule('music')">
-        <span class="nav-icon">🎵</span>
-        <span>Music</span>
-      </button>
-      <div style="padding: var(--space-16); margin-top: auto; border-top: 1px solid var(--color-card-border);">
-        <button class="btn btn--secondary" style="width: 100%;" onclick="exitTaskWorkspace()">← Exit Task</button>
-      </div>
-    </div>
-
-    <!-- Content Area -->
-    <div class="content-area">
-      
-      <!-- Task Dashboard View -->
-      <div id="taskDashboard" class="module active">
-        <div class="module-header">
-          <h2>📋 Task Dashboard</h2>
-        </div>
-        
-        <div style="display: flex; gap: var(--space-32); align-items: flex-start;">
-          <!-- Tasks List (Left) -->
-          <div style="flex: 1; min-width: 0;">
-            <div id="tasksList" class="tasks-list"></div>
-            
-            <!-- Empty State - Inside flex container for proper alignment -->
-            <div id="emptyTaskState" style="display: none; text-align: center; padding: 60px 20px;">
-              <div style="font-size: 64px; margin-bottom: 24px;">📋</div>
-              <h3 style="margin-bottom: 16px; color: var(--color-text);">No tasks yet</h3>
-              <p style="color: var(--color-text-secondary); margin-bottom: 24px; max-width: 500px; margin-left: auto; margin-right: auto;">
-                Create your first task to get started with focused work sessions
-              </p>
-              <button class="btn btn--primary" onclick="showCreateTaskForm()">+ Create First Task</button>
-            </div>
-          </div>
-          
-          <!-- Daily Study Goal (Right) -->
-          <div id="dailyGoalPanel" style="width: 300px; flex-shrink: 0; background-color: var(--color-surface); border: 1px solid var(--color-card-border); border-radius: var(--radius-lg); padding: var(--space-24); position: sticky; top: var(--space-24);">
-            <h3 style="margin-bottom: var(--space-16); font-size: var(--font-size-xl); color: var(--color-text);">📊 Today's Study Goal</h3>
-            
-            <div style="margin-bottom: var(--space-24);">
-              <label class="form-label">Set Daily Goal (minutes)</label>
-              <input type="number" id="dailyGoalInput" class="form-control" placeholder="120" min="10" max="600" value="120" onchange="updateDailyGoal()">
-            </div>
-            
-            <!-- Vertical Progress Bar -->
-            <div style="margin-bottom: var(--space-20);">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-12);">
-                <span style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">Progress</span>
-                <span id="goalPercentage" style="font-size: var(--font-size-lg); font-weight: var(--font-weight-bold); color: var(--color-primary);">0%</span>
-              </div>
-              
-              <div style="width: 100%; height: 300px; background-color: var(--color-secondary); border-radius: var(--radius-lg); position: relative; overflow: hidden; border: 2px solid var(--color-border);">
-                <div id="goalProgressBar" style="position: absolute; bottom: 0; left: 0; right: 0; height: 0%; background: linear-gradient(to top, var(--color-primary), var(--color-teal-300)); transition: all 0.5s ease; border-radius: var(--radius-base);"></div>
-              </div>
-              
-              <div style="margin-top: var(--space-12); text-align: center;">
-                <div id="goalTimeDisplay" style="font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--color-text); margin-bottom: var(--space-4);">0 min / 120 min</div>
-                <div id="goalCompletionMessage" style="font-size: var(--font-size-base); color: var(--color-success); font-weight: var(--font-weight-bold); display: none;">Daily Goal Completed! 🎉</div>
-              </div>
-            </div>
-          </div>
-        </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FocusHub - Study Companion</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <div class="top-bar-left">
+        <h1
+          class="app-title"
+          onclick="logoClickHandler()"
+          title="Click to return to dashboard"
+        >
+          FocusHub
+        </h1>
+        <span class="current-task" id="currentTaskDisplay">Task Dashboard</span>
       </div>
 
+      <div class="top-bar-right">
+        <!-- Theme Toggle -->
+        <button
+          id="themeToggle"
+          class="theme-toggle"
+          onclick="toggleTheme()"
+          title="Toggle theme"
+        >
+          🌙
+        </button>
 
-      <!-- Task Initial Prompt -->
-      <div id="taskInitialPrompt" class="module" style="display: none;">
-        <div style="max-width: 600px; margin: 60px auto; text-align: center;">
-          <h2 style="margin-bottom: 16px; color: var(--color-text);" id="promptTaskName">Welcome to Task</h2>
-          <p style="font-size: var(--font-size-lg); color: var(--color-text-secondary); margin-bottom: 8px;" id="promptTaskTime"></p>
-          <p style="color: var(--color-text-secondary); margin-bottom: 32px;">
-            Would you like to set up resources before starting?
-          </p>
-          
-          <div style="display: flex; gap: var(--space-16); justify-content: center; flex-wrap: wrap;">
-            <button class="btn btn--secondary" onclick="setupTaskResource('notes')" style="padding: 16px 24px;">
-              📝 Create Notes
+        <!-- Login Button (shown when not authenticated) -->
+        <button
+          id="loginBtn"
+          class="theme-toggle"
+          onclick="window.location.href='/auth.html'"
+          title="Login / Register"
+          style="
+            background: rgba(33, 128, 141, 0.15);
+            color: #21808d;
+            font-weight: 600;
+            font-size: 12px;
+            padding: 6px 15px;
+          "
+        >
+          Login
+        </button>
+
+        <!-- Logout Button (shown when authenticated) -->
+        <button
+          id="logoutBtn"
+          class="theme-toggle"
+          onclick="logout()"
+          title="Logout"
+          style="
+            background: rgba(255, 87, 87, 0.15);
+            color: #ff5757;
+            display: none;
+            font-weight: 600;
+            font-size: 12px;
+            padding: 6px 15px;
+          "
+        >
+          Logout
+        </button>
+
+        <!-- Timer Display -->
+        <div
+          class="timer-display"
+          style="display: flex; align-items: center; gap: var(--space-16)"
+        >
+          <div
+            class="timer-circle"
+            style="cursor: default"
+            title="Timer inactive"
+            id="timerCircle"
+          >
+            <svg width="60" height="60">
+              <circle class="timer-circle-bg" cx="30" cy="30" r="26"></circle>
+              <circle
+                id="timerProgress"
+                class="timer-circle-progress"
+                cx="30"
+                cy="30"
+                r="26"
+              ></circle>
+            </svg>
+            <div class="timer-text" id="timerText">25:00</div>
+          </div>
+          <div class="timer-info">
+            <div class="timer-phase" id="timerPhase">Ready</div>
+            <div class="timer-rounds" id="timerRounds"></div>
+          </div>
+
+          <!-- Task Timer Controls (shown only when in task workspace) -->
+          <div class="timer-controls hidden" id="taskTimerControls">
+            <button
+              class="timer-control-btn pause"
+              id="taskPauseBtn"
+              onclick="pauseOrResumeTaskTimer()"
+              title="Pause/Resume timer"
+            >
+              ⏸ Pause
             </button>
-            <button class="btn btn--secondary" onclick="setupTaskResource('whiteboard')" style="padding: 16px 24px;">
-              🎨 Create Whiteboard
+            <button
+              class="timer-control-btn stop"
+              onclick="stopTaskTimerEarly()"
+              title="Stop and exit without completing"
+            >
+              ⏹ Stop
             </button>
-            <button class="btn btn--primary" onclick="startWorkingOnTask()" style="padding: 16px 32px;">
-              ▶ Start Working
+            <button
+              class="timer-control-btn finish"
+              onclick="finishTaskEarly()"
+              title="Finish task and mark as complete"
+            >
+              ✓ Finish Task
             </button>
           </div>
         </div>
-      </div>
-      
-      <!-- Browser Module (Only in Task Workspace) -->
-      <div id="browserModule" class="module">
-        <div class="module-header">
-          <h2>🌐 Browser</h2>
-        </div>
 
-        <!-- Browser Interface -->
-        <div id="browserInterface" class="browser-interface" style="display: flex;">
-          <!-- Navigation Bar -->
-          <div class="browser-nav-bar">
-            <div class="browser-brand" id="browserBrand">
-              <span id="browserBrandIcon">🦆</span>
-              <span id="browserBrandName">Web Browser</span>
-            </div>
-            <button class="browser-nav-btn" onclick="browserGoBack()" title="Back">←</button>
-            <button class="browser-nav-btn" onclick="browserGoForward()" title="Forward">→</button>
-            <button class="browser-nav-btn" onclick="browserRefresh()" title="Refresh">⟲</button>
-            <input type="text" id="browserAddressBar" class="browser-address-bar" placeholder="Enter search term (e.g., Wikipedia, Python tutorial)..." onkeypress="handleAddressBarEnter(event)">
-            <button class="btn btn--primary" onclick="browserNavigate()" style="padding: 8px 24px;">Search</button>
+        <!-- Timer Customization Panel -->
+        <div id="timerPanel" class="timer-panel" style="display: none">
+          <div class="timer-panel-header">
+            <h3>⚙️ Pomodoro Timer</h3>
+            <button class="timer-panel-close" onclick="toggleTimerPanel()">
+              ×
+            </button>
           </div>
 
-          <!-- Tab Bar -->
-          <div class="browser-tab-bar" id="browserTabBar">
-            <!-- Tabs will be rendered here dynamically -->
-          </div>
-
-          <!-- Content Area -->
-          <div id="browserContentArea" class="browser-content-area">
-            <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--color-text-secondary);">Enter a search term to get started...</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Notes Module -->
-      <div id="notesModule" class="module">
-        <div class="module-header">
-          <h2>📝 Note Editor</h2>
-          <div class="notes-controls">
-            <button class="btn btn--primary" onclick="createNewNote()">New Note</button>
-            <button class="btn btn--secondary" onclick="saveCurrentNote()">Save</button>
-            <button class="btn btn--secondary" onclick="deleteCurrentNote()">Delete</button>
-          </div>
-        </div>
-
-        <div class="notes-layout">
-          <div class="notes-sidebar">
-            <h3>My Notes</h3>
-            <div class="notes-list" id="notesList"></div>
-          </div>
-
-          <div class="notes-editor">
-            <input type="text" id="noteTitle" class="note-title-input" placeholder="Note title...">
-            <div class="note-timestamp" id="noteTimestamp"></div>
-            
-            <div class="editor-toolbar">
-              <button class="toolbar-btn" onclick="formatText('bold')" title="Bold (Ctrl+B)"><b>B</b></button>
-              <button class="toolbar-btn" onclick="formatText('italic')" title="Italic (Ctrl+I)"><i>I</i></button>
-              <button class="toolbar-btn" onclick="formatText('underline')" title="Underline (Ctrl+U)"><u>U</u></button>
-              <button class="toolbar-btn" onclick="formatText('h1')" title="Heading 1"><b>H1</b></button>
-              <button class="toolbar-btn" onclick="formatText('h2')" title="Heading 2"><b>H2</b></button>
-              <button class="toolbar-btn" onclick="formatText('insertUnorderedList')" title="Bullet List">• List</button>
-              <button class="toolbar-btn" onclick="formatText('insertOrderedList')" title="Numbered List">1. List</button>
-              <button class="toolbar-btn" onclick="insertCitation()" title="Insert Citation">🔗 Citation</button>
-              <button class="toolbar-btn" onclick="showDiagramPicker()" title="Insert Diagram">🖼️ Diagram</button>
+          <div class="timer-panel-body">
+            <div class="slider-group">
+              <label class="slider-label">
+                <span>Work Time:</span>
+                <span id="workTimeValue" class="slider-value">25 min</span>
+              </label>
+              <input
+                type="range"
+                id="workTimeSlider"
+                class="custom-slider"
+                min="1"
+                max="120"
+                value="25"
+                oninput="updateSliderValue('workTime', this.value)"
+              />
             </div>
 
-            <div id="noteContent" class="rich-text-editor" contenteditable="true" placeholder="Start typing your notes here..."></div>
-            
-            <div class="export-controls">
-              <button class="btn btn--primary" onclick="exportNoteTXT()">📄 Download as TXT</button>
-              <button class="btn btn--primary" onclick="exportNotePDF()">📕 Download as PDF</button>
+            <div class="slider-group">
+              <label class="slider-label">
+                <span>Break Time:</span>
+                <span id="breakTimeValue" class="slider-value">5 min</span>
+              </label>
+              <input
+                type="range"
+                id="breakTimeSlider"
+                class="custom-slider"
+                min="1"
+                max="60"
+                value="5"
+                oninput="updateSliderValue('breakTime', this.value)"
+              />
             </div>
-          </div>
-        </div>
-      </div>
 
-
-
-      <!-- Whiteboard Module -->
-      <div id="whiteboardModule" class="module">
-        <div class="module-header">
-          <h2>🎨 Digital Whiteboard</h2>
-        </div>
-
-        <div class="whiteboard-container">
-          <!-- Main Canvas Area -->
-          <div class="whiteboard-main">
-            <!-- Toolbar -->
-            <div class="whiteboard-toolbar">
-              <!-- Drawing Tools -->
-              <div class="tool-group">
-                <button class="tool-btn active" onclick="selectToolByName('pencil')" data-tool="pencil" title="Pencil">🖊️</button>
-                <button class="tool-btn" onclick="selectToolByName('eraser')" data-tool="eraser" title="Eraser">🧹</button>
-                <button class="tool-btn" onclick="selectToolByName('rectangle')" data-tool="rectangle" title="Rectangle">⬜</button>
-                <button class="tool-btn" onclick="selectToolByName('circle')" data-tool="circle" title="Circle">⭕</button>
-                <button class="tool-btn" onclick="selectToolByName('line')" data-tool="line" title="Line">📏</button>
-                <button class="tool-btn" onclick="selectToolByName('arrow')" data-tool="arrow" title="Arrow">➡️</button>
-                <button class="tool-btn" onclick="selectToolByName('text')" data-tool="text" title="Text">📝</button>
-                <button class="tool-btn" onclick="clearCanvas()" title="Clear Canvas">🗑️</button>
-              </div>
-              
-              <div class="tool-divider"></div>
-              
-              <!-- Color Palette -->
-              <div class="tool-group">
-                <button class="color-btn active" onclick="selectColor('#000000')" style="background-color: #000000;" data-color="#000000" title="Black"></button>
-                <button class="color-btn" onclick="selectColor('#ff0000')" style="background-color: #ff0000;" data-color="#ff0000" title="Red"></button>
-                <button class="color-btn" onclick="selectColor('#0000ff')" style="background-color: #0000ff;" data-color="#0000ff" title="Blue"></button>
-                <button class="color-btn" onclick="selectColor('#00aa00')" style="background-color: #00aa00;" data-color="#00aa00" title="Green"></button>
-                <button class="color-btn" onclick="selectColor('#ffaa00')" style="background-color: #ffaa00;" data-color="#ffaa00" title="Orange"></button>
-                <button class="color-btn" onclick="selectColor('#aa00ff')" style="background-color: #aa00ff;" data-color="#aa00ff" title="Purple"></button>
-                <button class="color-btn" onclick="selectColor('#ffff00')" style="background-color: #ffff00;" data-color="#ffff00" title="Yellow"></button>
-                <button class="color-btn" onclick="selectColor('#00ffff')" style="background-color: #00ffff;" data-color="#00ffff" title="Cyan"></button>
-                <button class="color-btn" onclick="selectColor('#ffffff')" style="background-color: #ffffff; border: 2px solid #ccc;" data-color="#ffffff" title="White"></button>
-              </div>
-              
-              <div class="tool-divider"></div>
-              
-              <!-- Actions -->
-              <div class="tool-group">
-                <button class="btn btn--primary btn--sm" onclick="saveDiagram()">💾 Save</button>
-                <button class="btn btn--secondary btn--sm" onclick="exportCanvas()">⬇️ Export</button>
-              </div>
+            <div class="slider-group">
+              <label class="slider-label">
+                <span>Rounds:</span>
+                <span id="roundsValue" class="slider-value">5 rounds</span>
+              </label>
+              <input
+                type="range"
+                id="roundsSlider"
+                class="custom-slider"
+                min="1"
+                max="20"
+                value="5"
+                oninput="updateSliderValue('rounds', this.value)"
+              />
             </div>
-            
-            <!-- Canvas -->
-            <div class="whiteboard-canvas-wrapper">
-              <canvas id="whiteboard" width="1200" height="600"></canvas>
-            </div>
-          </div>
 
-          <!-- Saved Diagrams Gallery -->
-          <div class="diagram-gallery">
-            <h3>📂 Saved Diagrams</h3>
-            <div class="gallery-grid" id="diagramGallery"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Music Player -->
-      <div id="musicModule" class="module">
-        <div class="module-header">
-          <h2>🎵 Focus Music</h2>
-        </div>
-
-        <!-- Music Player Instructions -->
-        <div class="featured-stream">
-          <h3 class="stream-title">🎵 Focus Music Player</h3>
-          <p class="stream-description">Select a playlist below to start playing focus music</p>
-        </div>
-
-        <div class="music-layout">
-          <div class="playlist-section">
-            <h3>Focus Playlists</h3>
-            <div class="playlist-items">
-              <div class="playlist-item" onclick="playPlaylist('lofi')">
-                <span class="playlist-icon">🎵</span>
-                <div>
-                  <div class="playlist-name">Lo-fi Hip Hop Study</div>
-                  <div class="playlist-type">24/7 Radio</div>
-                </div>
-              </div>
-              <div class="playlist-item" onclick="playPlaylist('classical')">
-                <span class="playlist-icon">🎻</span>
-                <div>
-                  <div class="playlist-name">Classical for Focus</div>
-                  <div class="playlist-type">3+ Hours</div>
-                </div>
-              </div>
-              <div class="playlist-item" onclick="playPlaylist('ambient')">
-                <span class="playlist-icon">🌌</span>
-                <div>
-                  <div class="playlist-name">Ambient Soundscapes</div>
-                  <div class="playlist-type">8h</div>
-                </div>
-              </div>
-              <div class="playlist-item" onclick="playPlaylist('nature')">
-                <span class="playlist-icon">🌿</span>
-                <div>
-                  <div class="playlist-name">Nature Sounds</div>
-                  <div class="playlist-type">4h</div>
-                </div>
-              </div>
-              <div class="playlist-item" onclick="playPlaylist('whitenoise')">
-                <span class="playlist-icon">🔊</span>
-                <div>
-                  <div class="playlist-name">White Noise</div>
-                  <div class="playlist-type">10h</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="player-section">
-            <div id="playerPlaceholder" class="player-placeholder">
-              <h3>Select a playlist to start</h3>
-              <p>Choose from the focus playlists on the left</p>
-            </div>
-            <div id="musicPlayerContainer" style="display: none; width: 100%;">
-              <div style="margin-bottom: 16px; text-align: center;">
-                <button id="musicPlayPauseBtn" class="btn btn--primary" style="font-size: 18px; padding: 12px 32px; min-width: 180px;" onclick="toggleMusicPlayback()">
-                  ▶ PLAY MUSIC
+            <div class="timer-panel-actions">
+              <button
+                class="btn btn--primary"
+                style="width: 100%"
+                onclick="startPomodoroFromPanel()"
+                id="startPomodoroBtn"
+              >
+                ▶ Start
+              </button>
+              <div
+                style="display: flex; gap: 8px; margin-top: 8px"
+                id="runningControls"
+                style="display: none"
+              >
+                <button
+                  class="btn btn--secondary"
+                  style="flex: 1"
+                  onclick="pausePomodoroTimer()"
+                  id="pauseBtn"
+                >
+                  ⏸ Pause
+                </button>
+                <button
+                  class="btn btn--secondary"
+                  style="flex: 1"
+                  onclick="stopPomodoroSession()"
+                >
+                  ⏹ Stop
                 </button>
               </div>
-              <iframe 
-                id="musicPlayerFrame" 
-                width="100%" 
-                height="400" 
-                frameborder="0" 
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-                allowfullscreen>
-              </iframe>
+            </div>
+          </div>
+        </div>
+
+        <!-- Focus Stats -->
+        <div class="focus-stats">
+          <div class="stat-item">
+            <span class="stat-label">Sessions</span>
+            <span class="stat-value" id="sessionsToday">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Streak</span>
+            <span class="stat-value" id="currentStreak">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Anonymous usage allowed: tasks/notes saved locally when not authenticated -->
+
+    <!-- Main Container -->
+    <div class="main-container">
+      <!-- Floating Hamburger Button (shown when sidebar is collapsed) -->
+      <button
+        class="hamburger-btn-floating"
+        onclick="toggleSidebar()"
+        title="Open Menu"
+      >
+        ☰
+      </button>
+
+      <!-- Sidebar - Task Dashboard Mode -->
+      <div class="sidebar" id="dashboardSidebar">
+        <!-- Hamburger Menu in Sidebar Header -->
+        <div class="sidebar-header">
+          <button
+            class="hamburger-btn"
+            onclick="toggleSidebar()"
+            title="Toggle Menu"
+          >
+            ☰
+          </button>
+        </div>
+
+        <button class="nav-btn active" onclick="switchModule('tasks')">
+          <span class="nav-icon">📋</span>
+          <span>Tasks</span>
+        </button>
+        <button class="nav-btn" onclick="switchModule('music')">
+          <span class="nav-icon">🎵</span>
+          <span>Music</span>
+        </button>
+        <div
+          style="
+            padding: var(--space-16);
+            margin-top: auto;
+            border-top: 1px solid var(--color-card-border);
+          "
+        >
+          <button
+            class="btn btn--primary"
+            style="width: 100%"
+            onclick="showCreateTaskForm()"
+          >
+            + New Task
+          </button>
+        </div>
+      </div>
+
+      <!-- Sidebar - Task Workspace Mode -->
+      <div class="sidebar" id="workspaceSidebar" style="display: none">
+        <!-- Hamburger Menu in Sidebar Header -->
+        <div class="sidebar-header">
+          <button
+            class="hamburger-btn"
+            onclick="toggleSidebar()"
+            title="Toggle Menu"
+          >
+            ☰
+          </button>
+        </div>
+
+        <button class="nav-btn" onclick="switchTaskModule('browser')">
+          <span class="nav-icon">🌐</span>
+          <span>Browser</span>
+        </button>
+        <button class="nav-btn" onclick="switchTaskModule('notes')">
+          <span class="nav-icon">📝</span>
+          <span>Notes</span>
+        </button>
+        <button class="nav-btn" onclick="switchTaskModule('whiteboard')">
+          <span class="nav-icon">🎨</span>
+          <span>Whiteboard</span>
+        </button>
+        <button class="nav-btn" onclick="switchTaskModule('music')">
+          <span class="nav-icon">🎵</span>
+          <span>Music</span>
+        </button>
+        <div
+          style="
+            padding: var(--space-16);
+            margin-top: auto;
+            border-top: 1px solid var(--color-card-border);
+          "
+        >
+          <button
+            class="btn btn--secondary"
+            style="width: 100%"
+            onclick="exitTaskWorkspace()"
+          >
+            ← Exit Task
+          </button>
+        </div>
+      </div>
+
+      <!-- Content Area -->
+      <div class="content-area">
+        <!-- Task Dashboard View -->
+        <div id="taskDashboard" class="module active">
+          <div class="module-header">
+            <h2>📋 Task Dashboard</h2>
+          </div>
+
+          <div
+            style="display: flex; gap: var(--space-32); align-items: flex-start"
+          >
+            <!-- Tasks List (Left) -->
+            <div style="flex: 1; min-width: 0">
+              <div id="tasksList" class="tasks-list"></div>
+
+              <!-- Empty State - Inside flex container for proper alignment -->
+              <div
+                id="emptyTaskState"
+                style="display: none; text-align: center; padding: 60px 20px"
+              >
+                <div style="font-size: 64px; margin-bottom: 24px">📋</div>
+                <h3 style="margin-bottom: 16px; color: var(--color-text)">
+                  No tasks yet
+                </h3>
+                <p
+                  style="
+                    color: var(--color-text-secondary);
+                    margin-bottom: 24px;
+                    max-width: 500px;
+                    margin-left: auto;
+                    margin-right: auto;
+                  "
+                >
+                  Create your first task to get started with focused work
+                  sessions
+                </p>
+                <button class="btn btn--primary" onclick="showCreateTaskForm()">
+                  + Create First Task
+                </button>
+              </div>
+            </div>
+
+            <!-- Daily Study Goal (Right) -->
+            <div
+              id="dailyGoalPanel"
+              style="
+                width: 300px;
+                flex-shrink: 0;
+                background-color: var(--color-surface);
+                border: 1px solid var(--color-card-border);
+                border-radius: var(--radius-lg);
+                padding: var(--space-24);
+                position: sticky;
+                top: var(--space-24);
+              "
+            >
+              <h3
+                style="
+                  margin-bottom: var(--space-16);
+                  font-size: var(--font-size-xl);
+                  color: var(--color-text);
+                "
+              >
+                📊 Today's Study Goal
+              </h3>
+
+              <div style="margin-bottom: var(--space-24)">
+                <label class="form-label">Set Daily Goal (minutes)</label>
+                <input
+                  type="number"
+                  id="dailyGoalInput"
+                  class="form-control"
+                  placeholder="120"
+                  min="10"
+                  max="600"
+                  value="120"
+                  onchange="updateDailyGoal()"
+                />
+              </div>
+
+              <!-- Vertical Progress Bar -->
+              <div style="margin-bottom: var(--space-20)">
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: var(--space-12);
+                  "
+                >
+                  <span
+                    style="
+                      font-size: var(--font-size-sm);
+                      color: var(--color-text-secondary);
+                    "
+                    >Progress</span
+                  >
+                  <span
+                    id="goalPercentage"
+                    style="
+                      font-size: var(--font-size-lg);
+                      font-weight: var(--font-weight-bold);
+                      color: var(--color-primary);
+                    "
+                    >0%</span
+                  >
+                </div>
+
+                <div
+                  style="
+                    width: 100%;
+                    height: 300px;
+                    background-color: var(--color-secondary);
+                    border-radius: var(--radius-lg);
+                    position: relative;
+                    overflow: hidden;
+                    border: 2px solid var(--color-border);
+                  "
+                >
+                  <div
+                    id="goalProgressBar"
+                    style="
+                      position: absolute;
+                      bottom: 0;
+                      left: 0;
+                      right: 0;
+                      height: 0%;
+                      background: linear-gradient(
+                        to top,
+                        var(--color-primary),
+                        var(--color-teal-300)
+                      );
+                      transition: all 0.5s ease;
+                      border-radius: var(--radius-base);
+                    "
+                  ></div>
+                </div>
+
+                <div style="margin-top: var(--space-12); text-align: center">
+                  <div
+                    id="goalTimeDisplay"
+                    style="
+                      font-size: var(--font-size-lg);
+                      font-weight: var(--font-weight-semibold);
+                      color: var(--color-text);
+                      margin-bottom: var(--space-4);
+                    "
+                  >
+                    0 min / 120 min
+                  </div>
+                  <div
+                    id="goalCompletionMessage"
+                    style="
+                      font-size: var(--font-size-base);
+                      color: var(--color-success);
+                      font-weight: var(--font-weight-bold);
+                      display: none;
+                    "
+                  >
+                    Daily Goal Completed! 🎉
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Task Initial Prompt -->
+        <div id="taskInitialPrompt" class="module" style="display: none">
+          <div style="max-width: 600px; margin: 60px auto; text-align: center">
+            <h2
+              style="margin-bottom: 16px; color: var(--color-text)"
+              id="promptTaskName"
+            >
+              Welcome to Task
+            </h2>
+            <p
+              style="
+                font-size: var(--font-size-lg);
+                color: var(--color-text-secondary);
+                margin-bottom: 8px;
+              "
+              id="promptTaskTime"
+            ></p>
+            <p style="color: var(--color-text-secondary); margin-bottom: 32px">
+              Would you like to set up resources before starting?
+            </p>
+
+            <div
+              style="
+                display: flex;
+                gap: var(--space-16);
+                justify-content: center;
+                flex-wrap: wrap;
+              "
+            >
+              <button
+                class="btn btn--secondary"
+                onclick="setupTaskResource('notes')"
+                style="padding: 16px 24px"
+              >
+                📝 Create Notes
+              </button>
+              <button
+                class="btn btn--secondary"
+                onclick="setupTaskResource('whiteboard')"
+                style="padding: 16px 24px"
+              >
+                🎨 Create Whiteboard
+              </button>
+              <button
+                class="btn btn--primary"
+                onclick="startWorkingOnTask()"
+                style="padding: 16px 32px"
+              >
+                ▶ Start Working
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Browser Module (Only in Task Workspace) -->
+        <div id="browserModule" class="module">
+          <div class="module-header">
+            <h2>🌐 Browser</h2>
+          </div>
+
+          <!-- Browser Interface -->
+          <div
+            id="browserInterface"
+            class="browser-interface"
+            style="display: flex"
+          >
+            <!-- Navigation Bar -->
+            <div class="browser-nav-bar">
+              <div class="browser-brand" id="browserBrand">
+                <span id="browserBrandIcon">🦆</span>
+                <span id="browserBrandName">Web Browser</span>
+              </div>
+              <button
+                class="browser-nav-btn"
+                onclick="browserGoBack()"
+                title="Back"
+              >
+                ←
+              </button>
+              <button
+                class="browser-nav-btn"
+                onclick="browserGoForward()"
+                title="Forward"
+              >
+                →
+              </button>
+              <button
+                class="browser-nav-btn"
+                onclick="browserRefresh()"
+                title="Refresh"
+              >
+                ⟲
+              </button>
+              <input
+                type="text"
+                id="browserAddressBar"
+                class="browser-address-bar"
+                placeholder="Enter search term (e.g., Wikipedia, Python tutorial)..."
+                onkeypress="handleAddressBarEnter(event)"
+              />
+              <button
+                class="btn btn--primary"
+                onclick="browserNavigate()"
+                style="padding: 8px 24px"
+              >
+                Search
+              </button>
+            </div>
+
+            <!-- Tab Bar -->
+            <div class="browser-tab-bar" id="browserTabBar">
+              <!-- Tabs will be rendered here dynamically -->
+            </div>
+
+            <!-- Content Area -->
+            <div id="browserContentArea" class="browser-content-area">
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  height: 100%;
+                  color: var(--color-text-secondary);
+                "
+              >
+                Enter a search term to get started...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes Module -->
+        <div id="notesModule" class="module">
+          <div class="module-header">
+            <h2>📝 Note Editor</h2>
+            <div class="notes-controls">
+              <button class="btn btn--primary" onclick="createNewNote()">
+                New Note
+              </button>
+              <button class="btn btn--secondary" onclick="saveCurrentNote()">
+                Save
+              </button>
+              <button class="btn btn--secondary" onclick="deleteCurrentNote()">
+                Delete
+              </button>
+            </div>
+          </div>
+
+          <div class="notes-layout">
+            <div class="notes-sidebar">
+              <h3>My Notes</h3>
+              <div class="notes-list" id="notesList"></div>
+            </div>
+
+            <div class="notes-editor">
+              <input
+                type="text"
+                id="noteTitle"
+                class="note-title-input"
+                placeholder="Note title..."
+              />
+              <div class="note-timestamp" id="noteTimestamp"></div>
+
+              <div class="editor-toolbar">
+                <button
+                  class="toolbar-btn"
+                  onclick="formatText('bold')"
+                  title="Bold (Ctrl+B)"
+                >
+                  <b>B</b>
+                </button>
+                <button
+                  class="toolbar-btn"
+                  onclick="formatText('italic')"
+                  title="Italic (Ctrl+I)"
+                >
+                  <i>I</i>
+                </button>
+                <button
+                  class="toolbar-btn"
+                  onclick="formatText('underline')"
+                  title="Underline (Ctrl+U)"
+                >
+                  <u>U</u>
+                </button>
+                <button
+                  class="toolbar-btn"
+                  onclick="formatText('h1')"
+                  title="Heading 1"
+                >
+                  <b>H1</b>
+                </button>
+                <button
+                  class="toolbar-btn"
+                  onclick="formatText('h2')"
+                  title="Heading 2"
+                >
+                  <b>H2</b>
+                </button>
+                <button
+                  class="toolbar-btn"
+                  onclick="formatText('insertUnorderedList')"
+                  title="Bullet List"
+                >
+                  • List
+                </button>
+                <button
+                  class="toolbar-btn"
+                  onclick="formatText('insertOrderedList')"
+                  title="Numbered List"
+                >
+                  1. List
+                </button>
+                <button
+                  class="toolbar-btn"
+                  onclick="insertCitation()"
+                  title="Insert Citation"
+                >
+                  🔗 Citation
+                </button>
+                <button
+                  class="toolbar-btn"
+                  onclick="showDiagramPicker()"
+                  title="Insert Diagram"
+                >
+                  🖼️ Diagram
+                </button>
+              </div>
+
+              <div
+                id="noteContent"
+                class="rich-text-editor"
+                contenteditable="true"
+                placeholder="Start typing your notes here..."
+              ></div>
+
+              <div class="export-controls">
+                <button class="btn btn--primary" onclick="exportNoteTXT()">
+                  📄 Download as TXT
+                </button>
+                <button class="btn btn--primary" onclick="exportNotePDF()">
+                  📕 Download as PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Whiteboard Module -->
+        <div id="whiteboardModule" class="module">
+          <div class="module-header">
+            <h2>🎨 Digital Whiteboard</h2>
+          </div>
+
+          <div class="whiteboard-container">
+            <!-- Main Canvas Area -->
+            <div class="whiteboard-main">
+              <!-- Toolbar -->
+              <div class="whiteboard-toolbar">
+                <!-- Drawing Tools -->
+                <div class="tool-group">
+                  <button
+                    class="tool-btn active"
+                    onclick="selectToolByName('pencil')"
+                    data-tool="pencil"
+                    title="Pencil"
+                  >
+                    🖊️
+                  </button>
+                  <button
+                    class="tool-btn"
+                    onclick="selectToolByName('eraser')"
+                    data-tool="eraser"
+                    title="Eraser"
+                  >
+                    🧹
+                  </button>
+                  <button
+                    class="tool-btn"
+                    onclick="selectToolByName('rectangle')"
+                    data-tool="rectangle"
+                    title="Rectangle"
+                  >
+                    ⬜
+                  </button>
+                  <button
+                    class="tool-btn"
+                    onclick="selectToolByName('circle')"
+                    data-tool="circle"
+                    title="Circle"
+                  >
+                    ⭕
+                  </button>
+                  <button
+                    class="tool-btn"
+                    onclick="selectToolByName('line')"
+                    data-tool="line"
+                    title="Line"
+                  >
+                    📏
+                  </button>
+                  <button
+                    class="tool-btn"
+                    onclick="selectToolByName('arrow')"
+                    data-tool="arrow"
+                    title="Arrow"
+                  >
+                    ➡️
+                  </button>
+                  <button
+                    class="tool-btn"
+                    onclick="selectToolByName('text')"
+                    data-tool="text"
+                    title="Text"
+                  >
+                    📝
+                  </button>
+                  <button
+                    class="tool-btn"
+                    onclick="clearCanvas()"
+                    title="Clear Canvas"
+                  >
+                    🗑️
+                  </button>
+                </div>
+
+                <div class="tool-divider"></div>
+
+                <!-- Color Palette -->
+                <div class="tool-group">
+                  <button
+                    class="color-btn active"
+                    onclick="selectColor('#000000')"
+                    style="background-color: #000000"
+                    data-color="#000000"
+                    title="Black"
+                  ></button>
+                  <button
+                    class="color-btn"
+                    onclick="selectColor('#ff0000')"
+                    style="background-color: #ff0000"
+                    data-color="#ff0000"
+                    title="Red"
+                  ></button>
+                  <button
+                    class="color-btn"
+                    onclick="selectColor('#0000ff')"
+                    style="background-color: #0000ff"
+                    data-color="#0000ff"
+                    title="Blue"
+                  ></button>
+                  <button
+                    class="color-btn"
+                    onclick="selectColor('#00aa00')"
+                    style="background-color: #00aa00"
+                    data-color="#00aa00"
+                    title="Green"
+                  ></button>
+                  <button
+                    class="color-btn"
+                    onclick="selectColor('#ffaa00')"
+                    style="background-color: #ffaa00"
+                    data-color="#ffaa00"
+                    title="Orange"
+                  ></button>
+                  <button
+                    class="color-btn"
+                    onclick="selectColor('#aa00ff')"
+                    style="background-color: #aa00ff"
+                    data-color="#aa00ff"
+                    title="Purple"
+                  ></button>
+                  <button
+                    class="color-btn"
+                    onclick="selectColor('#ffff00')"
+                    style="background-color: #ffff00"
+                    data-color="#ffff00"
+                    title="Yellow"
+                  ></button>
+                  <button
+                    class="color-btn"
+                    onclick="selectColor('#00ffff')"
+                    style="background-color: #00ffff"
+                    data-color="#00ffff"
+                    title="Cyan"
+                  ></button>
+                  <button
+                    class="color-btn"
+                    onclick="selectColor('#ffffff')"
+                    style="background-color: #ffffff; border: 2px solid #ccc"
+                    data-color="#ffffff"
+                    title="White"
+                  ></button>
+                </div>
+
+                <div class="tool-divider"></div>
+
+                <!-- Actions -->
+                <div class="tool-group">
+                  <button
+                    class="btn btn--primary btn--sm"
+                    onclick="saveDiagram()"
+                  >
+                    💾 Save
+                  </button>
+                  <button
+                    class="btn btn--secondary btn--sm"
+                    onclick="exportCanvas()"
+                  >
+                    ⬇️ Export
+                  </button>
+                </div>
+              </div>
+
+              <!-- Canvas -->
+              <div class="whiteboard-canvas-wrapper">
+                <canvas id="whiteboard" width="1200" height="600"></canvas>
+              </div>
+            </div>
+
+            <!-- Saved Diagrams Gallery -->
+            <div class="diagram-gallery">
+              <h3>📂 Saved Diagrams</h3>
+              <div class="gallery-grid" id="diagramGallery"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Music Player -->
+        <div id="musicModule" class="module">
+          <div class="module-header">
+            <h2>🎵 Focus Music</h2>
+          </div>
+
+          <!-- Music Player Instructions -->
+          <div class="featured-stream">
+            <h3 class="stream-title">🎵 Focus Music Player</h3>
+            <p class="stream-description">
+              Select a playlist below to start playing focus music
+            </p>
+          </div>
+
+          <div class="music-layout">
+            <div class="playlist-section">
+              <h3>Focus Playlists</h3>
+              <div class="playlist-items">
+                <div class="playlist-item" onclick="playPlaylist('lofi')">
+                  <span class="playlist-icon">🎵</span>
+                  <div>
+                    <div class="playlist-name">Lo-fi Hip Hop Study</div>
+                    <div class="playlist-type">24/7 Radio</div>
+                  </div>
+                </div>
+                <div class="playlist-item" onclick="playPlaylist('classical')">
+                  <span class="playlist-icon">🎻</span>
+                  <div>
+                    <div class="playlist-name">Classical for Focus</div>
+                    <div class="playlist-type">3+ Hours</div>
+                  </div>
+                </div>
+                <div class="playlist-item" onclick="playPlaylist('ambient')">
+                  <span class="playlist-icon">🌌</span>
+                  <div>
+                    <div class="playlist-name">Ambient Soundscapes</div>
+                    <div class="playlist-type">8h</div>
+                  </div>
+                </div>
+                <div class="playlist-item" onclick="playPlaylist('nature')">
+                  <span class="playlist-icon">🌿</span>
+                  <div>
+                    <div class="playlist-name">Nature Sounds</div>
+                    <div class="playlist-type">4h</div>
+                  </div>
+                </div>
+                <div class="playlist-item" onclick="playPlaylist('whitenoise')">
+                  <span class="playlist-icon">🔊</span>
+                  <div>
+                    <div class="playlist-name">White Noise</div>
+                    <div class="playlist-type">10h</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="player-section">
+              <div id="playerPlaceholder" class="player-placeholder">
+                <h3>Select a playlist to start</h3>
+                <p>Choose from the focus playlists on the left</p>
+              </div>
+              <div id="musicPlayerContainer" style="display: none; width: 100%">
+                <div style="margin-bottom: 16px; text-align: center">
+                  <button
+                    id="musicPlayPauseBtn"
+                    class="btn btn--primary"
+                    style="
+                      font-size: 18px;
+                      padding: 12px 32px;
+                      min-width: 180px;
+                    "
+                    onclick="toggleMusicPlayback()"
+                  >
+                    ▶ PLAY MUSIC
+                  </button>
+                </div>
+                <iframe
+                  id="musicPlayerFrame"
+                  width="100%"
+                  height="400"
+                  frameborder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowfullscreen
+                >
+                </iframe>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Create Task Modal -->
-  <div id="createTaskModal" class="modal" style="display: none;">
-    <div class="modal-content">
-      <h2>Create New Task</h2>
-      <div style="margin-bottom: var(--space-16);">
-        <label class="form-label">Task Name</label>
-        <input type="text" id="newTaskName" class="form-control" placeholder="e.g., Math Homework, Read Chapter 5">
-      </div>
-      <div style="margin-bottom: var(--space-24);">
-        <label class="form-label">Time Allocation</label>
-        <div style="display: flex; gap: var(--space-8); margin-bottom: var(--space-12); flex-wrap: wrap;">
-          <button type="button" class="btn btn--secondary btn--sm" onclick="selectPresetTime(10)">10 min</button>
-          <button type="button" class="btn btn--secondary btn--sm" onclick="selectPresetTime(30)">30 min</button>
-          <button type="button" class="btn btn--secondary btn--sm" onclick="selectPresetTime(45)">45 min</button>
-          <button type="button" class="btn btn--secondary btn--sm" onclick="selectPresetTime(60)">60 min</button>
+    <!-- Create Task Modal -->
+    <div id="createTaskModal" class="modal" style="display: none">
+      <div class="modal-content">
+        <h2>Create New Task</h2>
+        <div style="margin-bottom: var(--space-16)">
+          <label class="form-label">Task Name</label>
+          <input
+            type="text"
+            id="newTaskName"
+            class="form-control"
+            placeholder="e.g., Math Homework, Read Chapter 5"
+          />
         </div>
-        <label class="form-label" style="margin-bottom: var(--space-8);">Custom Duration (minutes)</label>
-        <input type="number" id="newTaskTime" class="form-control" placeholder="Enter custom duration" min="1" max="480">
+        <div style="margin-bottom: var(--space-24)">
+          <label class="form-label">Time Allocation</label>
+          <div
+            style="
+              display: flex;
+              gap: var(--space-8);
+              margin-bottom: var(--space-12);
+              flex-wrap: wrap;
+            "
+          >
+            <button
+              type="button"
+              class="btn btn--secondary btn--sm"
+              onclick="selectPresetTime(10)"
+            >
+              10 min
+            </button>
+            <button
+              type="button"
+              class="btn btn--secondary btn--sm"
+              onclick="selectPresetTime(30)"
+            >
+              30 min
+            </button>
+            <button
+              type="button"
+              class="btn btn--secondary btn--sm"
+              onclick="selectPresetTime(45)"
+            >
+              45 min
+            </button>
+            <button
+              type="button"
+              class="btn btn--secondary btn--sm"
+              onclick="selectPresetTime(60)"
+            >
+              60 min
+            </button>
+          </div>
+          <label class="form-label" style="margin-bottom: var(--space-8)"
+            >Custom Duration (minutes)</label
+          >
+          <input
+            type="number"
+            id="newTaskTime"
+            class="form-control"
+            placeholder="Enter custom duration"
+            min="1"
+            max="480"
+          />
+        </div>
+        <div style="display: flex; gap: var(--space-12)">
+          <button
+            class="btn btn--primary"
+            onclick="createTask()"
+            style="flex: 1"
+          >
+            Create Task
+          </button>
+          <button
+            class="btn btn--secondary"
+            onclick="closeCreateTaskForm()"
+            style="flex: 1"
+          >
+            Cancel
+          </button>
+        </div>
       </div>
-      <div style="display: flex; gap: var(--space-12);">
-        <button class="btn btn--primary" onclick="createTask()" style="flex: 1;">Create Task</button>
-        <button class="btn btn--secondary" onclick="closeCreateTaskForm()" style="flex: 1;">Cancel</button>
+    </div>
+
+    <!-- Welcome Modal -->
+    <div id="welcomeModal" class="modal" style="display: none">
+      <div class="modal-content">
+        <h2>Welcome to FocusHub! 🎓</h2>
+        <p>Your task-centric study companion - now redesigned!</p>
+        <h3>How it works:</h3>
+        <ul>
+          <li>
+            <strong>Create Tasks:</strong> Click "+ New Task" to create a task
+            with time allocation
+          </li>
+          <li>
+            <strong>Enter Task Workspace:</strong> Click any task to start
+            working on it
+          </li>
+          <li>
+            <strong>Task-Specific Resources:</strong> Each task has its own
+            notes and whiteboard
+          </li>
+          <li>
+            <strong>Shared Music:</strong> Music player available across all
+            tasks
+          </li>
+          <li>
+            <strong>Data Isolation:</strong> Notes and diagrams are saved per
+            task
+          </li>
+          <li>
+            <strong>Pomodoro Timer:</strong> Click the timer to customize and
+            track your focus sessions
+          </li>
+        </ul>
+        <p class="warning">
+          💡 Tip: Start by creating your first task and explore the focused
+          workspace!
+        </p>
+        <button class="btn btn--primary" onclick="closeWelcome()">
+          Get Started
+        </button>
       </div>
     </div>
-  </div>
-  
-  <!-- Welcome Modal -->
-  <div id="welcomeModal" class="modal" style="display: none;">
-    <div class="modal-content">
-      <h2>Welcome to FocusHub! 🎓</h2>
-      <p>Your task-centric study companion - now redesigned!</p>
-      <h3>How it works:</h3>
-      <ul>
-        <li><strong>Create Tasks:</strong> Click "+ New Task" to create a task with time allocation</li>
-        <li><strong>Enter Task Workspace:</strong> Click any task to start working on it</li>
-        <li><strong>Task-Specific Resources:</strong> Each task has its own notes and whiteboard</li>
-        <li><strong>Shared Music:</strong> Music player available across all tasks</li>
-        <li><strong>Data Isolation:</strong> Notes and diagrams are saved per task</li>
-        <li><strong>Pomodoro Timer:</strong> Click the timer to customize and track your focus sessions</li>
-      </ul>
-      <p class="warning">💡 Tip: Start by creating your first task and explore the focused workspace!</p>
-      <button class="btn btn--primary" onclick="closeWelcome()">Get Started</button>
-    </div>
-  </div>
 
-  <!-- Timer Complete Modal -->
-  <div id="timerCompleteModal" class="modal" style="display: none;">
-    <div class="modal-content">
-      <h2>🎉 Session Complete!</h2>
-      <p id="motivationalMessage" style="font-size: 18px; text-align: center; margin: 24px 0;"></p>
-      <button class="btn btn--primary" onclick="closeTimerComplete()">Continue</button>
+    <!-- Timer Complete Modal -->
+    <div id="timerCompleteModal" class="modal" style="display: none">
+      <div class="modal-content">
+        <h2>🎉 Session Complete!</h2>
+        <p
+          id="motivationalMessage"
+          style="font-size: 18px; text-align: center; margin: 24px 0"
+        ></p>
+        <button class="btn btn--primary" onclick="closeTimerComplete()">
+          Continue
+        </button>
+      </div>
     </div>
-  </div>
 
-  <!-- Diagram Picker Modal -->
-  <div id="diagramPickerModal" class="modal" style="display: none;">
-    <div class="modal-content">
-      <h2>Select Diagram to Insert</h2>
-      <div class="gallery-grid" id="diagramPickerGallery"></div>
-      <button class="btn btn--secondary" onclick="closeDiagramPicker()" style="margin-top: 16px;">Cancel</button>
+    <!-- Diagram Picker Modal -->
+    <div id="diagramPickerModal" class="modal" style="display: none">
+      <div class="modal-content">
+        <h2>Select Diagram to Insert</h2>
+        <div class="gallery-grid" id="diagramPickerGallery"></div>
+        <button
+          class="btn btn--secondary"
+          onclick="closeDiagramPicker()"
+          style="margin-top: 16px"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
-  </div>
 
-  <script src="app.js"></script>
-</body>
+    <script src="app.js"></script>
+  </body>
 </html>

@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FocusHub - Authentication</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      .auth-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #21808d 0%, #134252 100%);
+        padding: 20px;
+      }
+
+      .auth-card {
+        background: #fffffe;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        max-width: 450px;
+        width: 100%;
+        padding: 40px;
+        animation: slideUp 0.5s ease-out;
+      }
+
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .auth-card h1 {
+        color: #134252;
+        text-align: center;
+        margin-bottom: 10px;
+        font-size: 28px;
+      }
+
+      .auth-card p {
+        color: #626c71;
+        text-align: center;
+        margin-bottom: 30px;
+        font-size: 14px;
+      }
+
+      .form-group {
+        margin-bottom: 18px;
+      }
+
+      .form-label {
+        display: block;
+        margin-bottom: 6px;
+        color: #134252;
+        font-weight: 500;
+        font-size: 14px;
+      }
+
+      .form-input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid #a7a9a9;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        box-sizing: border-box;
+        font-family: inherit;
+        background-color: #fffffe;
+      }
+
+      .form-input:focus {
+        outline: none;
+        border-color: #21808d;
+        box-shadow: 0 0 0 3px rgba(33, 128, 141, 0.1);
+      }
+
+      .form-input.error {
+        border-color: #c0152f;
+        box-shadow: 0 0 0 3px rgba(192, 21, 47, 0.1);
+      }
+
+      .error-message {
+        color: #c0152f;
+        font-size: 12px;
+        margin-top: 4px;
+        display: none;
+      }
+
+      .error-message.show {
+        display: block;
+      }
+
+      .success-message {
+        background: rgba(33, 128, 141, 0.1);
+        color: #21808d;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-size: 14px;
+        display: none;
+      }
+
+      .success-message.show {
+        display: block;
+      }
+
+      .submit-btn {
+        width: 100%;
+        padding: 12px;
+        background: linear-gradient(135deg, #21808d 0%, #134252 100%);
+        color: #fffffe;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-top: 10px;
+      }
+
+      .submit-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(33, 128, 141, 0.3);
+      }
+
+      .submit-btn:active {
+        transform: translateY(0);
+      }
+
+      .submit-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .toggle-form {
+        text-align: center;
+        margin-top: 20px;
+        color: #626c71;
+        font-size: 14px;
+      }
+
+      .toggle-form a {
+        color: #21808d;
+        text-decoration: none;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .toggle-form a:hover {
+        text-decoration: underline;
+      }
+
+      .hidden-form {
+        display: none;
+      }
+
+      .form-columns {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .form-columns .form-group {
+        margin-bottom: 0;
+      }
+
+      @media (max-width: 480px) {
+        .auth-card {
+          padding: 30px 20px;
+        }
+
+        .form-columns {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 0.8s linear infinite;
+        margin-right: 8px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .date-input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid #a7a9a9;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        box-sizing: border-box;
+        background-color: #fffffe;
+      }
+
+      .date-input:focus {
+        outline: none;
+        border-color: #21808d;
+        box-shadow: 0 0 0 3px rgba(33, 128, 141, 0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="auth-container">
+      <div class="auth-card">
+        <!-- LOGIN FORM -->
+        <div id="loginForm" class="auth-form">
+          <h1>Welcome to FocusHub</h1>
+          <p>Sign in to continue</p>
+
+          <div class="success-message" id="loginSuccess"></div>
+          <div class="error-message" id="loginError"></div>
+
+          <form id="loginFormElement">
+            <div class="form-group">
+              <label class="form-label" for="loginEmail">Email</label>
+              <input
+                type="email"
+                id="loginEmail"
+                class="form-input"
+                placeholder="your@email.com"
+                required
+              />
+              <div class="error-message" id="loginEmailError"></div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="loginPassword">Password</label>
+              <input
+                type="password"
+                id="loginPassword"
+                class="form-input"
+                placeholder="••••••••"
+                required
+              />
+              <div class="error-message" id="loginPasswordError"></div>
+            </div>
+
+            <button type="submit" class="submit-btn" id="loginBtn">
+              Sign In
+            </button>
+          </form>
+
+          <div class="toggle-form">
+            Don't have an account? <a onclick="toggleForms()">Sign up here</a>
+          </div>
+        </div>
+
+        <!-- REGISTER FORM -->
+        <div id="registerForm" class="auth-form hidden-form">
+          <h1>Create Account</h1>
+          <p>Join FocusHub today</p>
+
+          <div class="success-message" id="registerSuccess"></div>
+          <div class="error-message" id="registerError"></div>
+
+          <form id="registerFormElement">
+            <div class="form-columns">
+              <div class="form-group">
+                <label class="form-label" for="registerName">First Name</label>
+                <input
+                  type="text"
+                  id="registerName"
+                  class="form-input"
+                  placeholder="John"
+                  required
+                />
+                <div class="error-message" id="registerNameError"></div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="registerLastname"
+                  >Last Name</label
+                >
+                <input
+                  type="text"
+                  id="registerLastname"
+                  class="form-input"
+                  placeholder="Doe"
+                  required
+                />
+                <div class="error-message" id="registerLastnameError"></div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="registerBirthdate"
+                >Date of Birth</label
+              >
+              <input
+                type="date"
+                id="registerBirthdate"
+                class="date-input"
+                required
+              />
+              <div class="error-message" id="registerBirthdateError"></div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="registerEmail">Email</label>
+              <input
+                type="email"
+                id="registerEmail"
+                class="form-input"
+                placeholder="your@email.com"
+                required
+              />
+              <div class="error-message" id="registerEmailError"></div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="registerPassword">Password</label>
+              <input
+                type="password"
+                id="registerPassword"
+                class="form-input"
+                placeholder="Minimum 6 characters"
+                required
+              />
+              <div class="error-message" id="registerPasswordError"></div>
+            </div>
+
+            <button type="submit" class="submit-btn" id="registerBtn">
+              Create Account
+            </button>
+          </form>
+
+          <div class="toggle-form">
+            Already have an account? <a onclick="toggleForms()">Sign in here</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Toggle between login and register forms
+      function toggleForms() {
+        const loginForm = document.getElementById("loginForm");
+        const registerForm = document.getElementById("registerForm");
+        loginForm.classList.toggle("hidden-form");
+        registerForm.classList.toggle("hidden-form");
+        clearAllMessages();
+        clearAllErrors();
+      }
+
+      // Clear all error messages
+      function clearAllErrors() {
+        document.querySelectorAll(".error-message").forEach((el) => {
+          el.classList.remove("show");
+          el.textContent = "";
+        });
+        document.querySelectorAll(".form-input").forEach((el) => {
+          el.classList.remove("error");
+        });
+        document.querySelectorAll(".date-input").forEach((el) => {
+          el.classList.remove("error");
+        });
+      }
+
+      // Clear all success messages
+      function clearAllMessages() {
+        document.querySelectorAll(".success-message").forEach((el) => {
+          el.classList.remove("show");
+          el.textContent = "";
+        });
+      }
+
+      // Show error message
+      function showError(fieldId, message) {
+        const errorEl = document.getElementById(fieldId + "Error");
+        const inputEl = document.getElementById(fieldId);
+        if (errorEl) {
+          errorEl.textContent = message;
+          errorEl.classList.add("show");
+        }
+        if (inputEl) {
+          inputEl.classList.add("error");
+        }
+      }
+
+      // Show success message
+      function showSuccess(messageId, message) {
+        const successEl = document.getElementById(messageId);
+        if (successEl) {
+          successEl.textContent = message;
+          successEl.classList.add("show");
+        }
+      }
+
+      // Login handler
+      document
+        .getElementById("loginFormElement")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          clearAllErrors();
+          clearAllMessages();
+
+          const email = document.getElementById("loginEmail").value.trim();
+          const password = document.getElementById("loginPassword").value;
+
+          const loginBtn = document.getElementById("loginBtn");
+          loginBtn.disabled = true;
+          loginBtn.innerHTML = '<span class="spinner"></span>Signing in...';
+
+          try {
+            const response = await fetch("/api/auth/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ email, contraseña: password }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              showSuccess(
+                "loginSuccess",
+                "✓ Sign in successful. Redirecting..."
+              );
+              setTimeout(() => {
+                window.location.href = "/index.html";
+              }, 1500);
+            } else {
+              showError("loginEmail", data.message);
+            }
+          } catch (error) {
+            console.error("Login error:", error);
+            showError("loginEmail", "Error connecting to server");
+          } finally {
+            loginBtn.disabled = false;
+            loginBtn.innerHTML = "Sign In";
+          }
+        });
+
+      // Register handler
+      document
+        .getElementById("registerFormElement")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          clearAllErrors();
+          clearAllMessages();
+
+          const nombre = document.getElementById("registerName").value.trim();
+          const apellido = document
+            .getElementById("registerLastname")
+            .value.trim();
+          const fecha_nacimiento =
+            document.getElementById("registerBirthdate").value;
+          const email = document.getElementById("registerEmail").value.trim();
+          const contraseña = document.getElementById("registerPassword").value;
+
+          // Validations
+          let hasError = false;
+
+          if (!nombre) {
+            showError("registerName", "First name is required");
+            hasError = true;
+          }
+
+          if (!apellido) {
+            showError("registerLastname", "Last name is required");
+            hasError = true;
+          }
+
+          if (!fecha_nacimiento) {
+            showError("registerBirthdate", "Date of birth is required");
+            hasError = true;
+          }
+
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!email || !emailRegex.test(email)) {
+            showError("registerEmail", "Invalid email");
+            hasError = true;
+          }
+
+          if (contraseña.length < 6) {
+            showError("registerPassword", "Minimum 6 characters");
+            hasError = true;
+          }
+
+          if (hasError) return;
+
+          const registerBtn = document.getElementById("registerBtn");
+          registerBtn.disabled = true;
+          registerBtn.innerHTML =
+            '<span class="spinner"></span>Creating account...';
+
+          try {
+            const response = await fetch("/api/auth/register", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                nombre,
+                apellido,
+                fecha_nacimiento,
+                email,
+                contraseña,
+              }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              showSuccess(
+                "registerSuccess",
+                "✓ Account created successfully. Redirecting..."
+              );
+              setTimeout(() => {
+                window.location.href = "/index.html";
+              }, 1500);
+            } else {
+              showError("registerEmail", data.message);
+            }
+          } catch (error) {
+            console.error("Register error:", error);
+            showError("registerEmail", "Error connecting to server");
+          } finally {
+            registerBtn.disabled = false;
+            registerBtn.innerHTML = "Create Account";
+          }
+        });
+
+      // Check if already logged in
+      window.addEventListener("DOMContentLoaded", async () => {
+        try {
+          const response = await fetch("/api/auth/check", {
+            credentials: "include",
+          });
+          const data = await response.json();
+          if (data.authenticated) {
+            window.location.href = "/index.html";
+          }
+        } catch (error) {
+          console.error("Auth check error:", error);
+        }
+      });
+    </script>
+  </body>
+</html>
