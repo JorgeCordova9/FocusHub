@@ -63,6 +63,15 @@ let startX, startY;
 let canvasHistory = [];
 let savedImageData = null;
 
+// Image tracking for whiteboard
+let canvasImages = [];
+let selectedImage = null;
+let isDraggingImage = false;
+let isResizingImage = false;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+let canvasSnapshot = null; // Store canvas drawing state
+
 // Music Player State
 let currentPlaylistType = null;
 let musicPlayerAPI = null;
@@ -98,6 +107,13 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // Show welcome modal
   document.getElementById("welcomeModal").style.display = "flex";
+
+  // Add keyboard listener for deleting images
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Delete" && selectedImage) {
+      deleteSelectedImage();
+    }
+  });
 });
 
 // Logo Click Handler - Always return to home/dashboard
@@ -2472,10 +2488,10 @@ function initializeWhiteboard() {
   canvas = document.getElementById("whiteboard");
   ctx = canvas.getContext("2d");
 
-  canvas.addEventListener("mousedown", startDrawing);
-  canvas.addEventListener("mousemove", draw);
-  canvas.addEventListener("mouseup", stopDrawing);
-  canvas.addEventListener("mouseout", stopDrawing);
+  canvas.addEventListener("mousedown", canvasMouseDown);
+  canvas.addEventListener("mousemove", canvasMouseMove);
+  canvas.addEventListener("mouseup", canvasMouseUp);
+  canvas.addEventListener("mouseout", canvasMouseUp);
 
   ctx.fillStyle = "white";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2498,8 +2514,9 @@ function startDrawing(e) {
     currentTool === "line" ||
     currentTool === "arrow"
   ) {
-    // Save the current canvas state for shape preview
-    savedImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    // For shape preview, we'll use canvasSnapshot (drawing only)
+    // This way we avoid restoring old image positions
+    // savedImageData is no longer used for shape preview
   }
 }
 
@@ -2531,9 +2548,19 @@ function draw(e) {
     currentTool === "line" ||
     currentTool === "arrow"
   ) {
-    // Restore saved image and draw preview
-    if (savedImageData) {
-      ctx.putImageData(savedImageData, 0, 0);
+    // For shape preview: restore drawing snapshot and redraw images on top
+    if (canvasSnapshot) {
+      ctx.putImageData(canvasSnapshot, 0, 0);
+    } else {
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    
+    // Redraw all images
+    for (let imgObj of canvasImages) {
+      if (imgObj.img && imgObj.img.complete) {
+        ctx.drawImage(imgObj.img, imgObj.x, imgObj.y, imgObj.width, imgObj.height);
+      }
     }
 
     ctx.strokeStyle = currentColor;
@@ -2578,6 +2605,39 @@ function stopDrawing(e) {
     }
   }
 
+  // After any drawing (including shapes), update the snapshot
+  // Get the current canvas (drawing + images)
+  const currentCanvas = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  
+  // Create snapshot with only the drawing (white out image areas)
+  const drawingOnly = ctx.createImageData(canvas.width, canvas.height);
+  const drawingData = drawingOnly.data;
+  const currentData = currentCanvas.data;
+  
+  // Start with a copy of current canvas
+  for (let i = 0; i < currentData.length; i++) {
+    drawingData[i] = currentData[i];
+  }
+  
+  // Replace image areas with white
+  for (let imgObj of canvasImages) {
+    const x1 = Math.max(0, Math.floor(imgObj.x));
+    const y1 = Math.max(0, Math.floor(imgObj.y));
+    const x2 = Math.min(canvas.width, Math.ceil(imgObj.x + imgObj.width));
+    const y2 = Math.min(canvas.height, Math.ceil(imgObj.y + imgObj.height));
+    
+    for (let py = y1; py < y2; py++) {
+      for (let px = x1; px < x2; px++) {
+        const idx = (py * canvas.width + px) * 4;
+        drawingData[idx] = 255;     // R - white
+        drawingData[idx + 1] = 255; // G - white
+        drawingData[idx + 2] = 255; // B - white
+        drawingData[idx + 3] = 255; // A - opaque
+      }
+    }
+  }
+  
+  canvasSnapshot = drawingOnly;
   savedImageData = null;
 }
 
@@ -2655,9 +2715,21 @@ function saveDiagram() {
   if (!task) return;
 
   const imageData = canvas.toDataURL("image/png");
+  
+  // Save images data separately (store src URLs from canvas images)
+  const savedImages = canvasImages.map(img => ({
+    id: img.id,
+    src: img.src,
+    x: img.x,
+    y: img.y,
+    width: img.width,
+    height: img.height
+  }));
+
   const diagram = {
     id: Date.now(),
     imageData,
+    images: savedImages,
     timestamp: new Date().toISOString(),
   };
 
@@ -2718,8 +2790,39 @@ function loadDiagram(index) {
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0);
+
+    // Restore images if they exist
+    if (diagram.images && diagram.images.length > 0) {
+      canvasImages = [];
+      let imagesLoaded = 0;
+      const totalImages = diagram.images.length;
+
+      diagram.images.forEach(savedImg => {
+        const imgObj = {
+          id: savedImg.id,
+          src: savedImg.src,
+          x: savedImg.x,
+          y: savedImg.y,
+          width: savedImg.width,
+          height: savedImg.height,
+          img: null
+        };
+
+        const loadedImg = new Image();
+        loadedImg.onload = () => {
+          imgObj.img = loadedImg;
+          imagesLoaded++;
+          if (imagesLoaded === totalImages) {
+            redrawCanvas();
+          }
+        };
+        loadedImg.src = savedImg.src;
+        canvasImages.push(imgObj);
+      });
+    }
   };
   img.src = diagram.imageData;
+  selectedImage = null;
   showNotification("Diagram loaded into canvas!");
 }
 
@@ -2831,5 +2934,529 @@ function updatePlayPauseButton() {
       btn.classList.remove("btn--secondary");
       btn.classList.add("btn--primary");
     }
+  }
+}
+
+// ===== PDF IMPORT FUNCTIONS =====
+async function handlePdfImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (file.type !== 'application/pdf') {
+    showNotification('❌ Please select a valid PDF file');
+    return;
+  }
+
+  if (!appData.currentTask) {
+    showNotification('❌ Please select a task first');
+    return;
+  }
+
+  try {
+    showNotification('📄 Extracting PDF content...');
+    const text = await extractPdfText(file);
+    
+    if (text.trim().length === 0) {
+      showNotification('⚠️ PDF appears to be empty or unreadable');
+      return;
+    }
+
+    // Get filename without extension
+    const fileName = file.name.replace(/\.pdf$/i, '');
+    
+    // Create a new note with the PDF content
+    const task = appData.tasks.find(t => t.id === appData.currentTask);
+    if (!task) return;
+
+    if (!task.notes) task.notes = [];
+    
+    const newNote = {
+      id: Date.now(),
+      title: fileName,
+      content: text,
+      createdAt: new Date().toLocaleString()
+    };
+
+    task.notes.push(newNote);
+    
+    // Load the new note
+    loadTaskNote(appData.currentTask, newNote.id);
+    
+    // Refresh notes list
+    loadTaskNotes(task);
+    
+    showNotification(`✅ PDF imported as "${fileName}"`);
+  } catch (error) {
+    console.error('PDF import error:', error);
+    showNotification('❌ Failed to import PDF: ' + error.message);
+  }
+
+  // Reset file input
+  document.getElementById('pdfFileInput').value = '';
+}
+
+async function extractPdfText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = async (e) => {
+      try {
+        const pdf = await pdfjsLib.getDocument({ data: e.target.result }).promise;
+        let fullText = '';
+        
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageStructure = buildPageStructure(textContent.items);
+          
+          // Add page break between pages (except for the first page)
+          if (i > 1) {
+            fullText += '\n---\n'; // Page separator
+          }
+          
+          fullText += pageStructure;
+        }
+        
+        resolve(fullText);
+      } catch (error) {
+        reject(error);
+      }
+    };
+    
+    reader.onerror = () => {
+      reject(new Error('Failed to read file'));
+    };
+    
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// Helper function to build page structure with proper formatting
+function buildPageStructure(items) {
+  if (!items || items.length === 0) return '';
+  
+  let pageText = '';
+  let currentLine = '';
+  let lastY = null;
+  let lastX = null;
+  const LINE_HEIGHT_THRESHOLD = 5; // Threshold for detecting new lines
+  const SPACE_WIDTH = 5; // Threshold for detecting spaces between words
+  
+  // Sort items by Y position (top to bottom), then X position (left to right)
+  const sortedItems = items.sort((a, b) => {
+    const yDiff = Math.abs(b.y - a.y);
+    if (yDiff > LINE_HEIGHT_THRESHOLD) {
+      return b.y - a.y; // Different Y = new line
+    }
+    return a.x - b.x; // Same line, sort by X
+  });
+  
+  for (let item of sortedItems) {
+    const text = item.str.trim();
+    
+    if (!text) continue; // Skip empty items
+    
+    // Check if we need to start a new line
+    if (lastY !== null && Math.abs(item.y - lastY) > LINE_HEIGHT_THRESHOLD) {
+      // New line detected
+      if (currentLine.trim()) {
+        pageText += currentLine.trim() + '\n';
+      }
+      currentLine = text;
+      lastX = item.x + (item.width || 0);
+    } else if (lastX !== null && item.x - lastX > SPACE_WIDTH) {
+      // Space detected between words on same line
+      currentLine += ' ' + text;
+      lastX = item.x + (item.width || 0);
+    } else {
+      // Continue on same line
+      currentLine += text;
+      lastX = item.x + (item.width || 0);
+    }
+    
+    lastY = item.y;
+  }
+  
+  // Add any remaining text
+  if (currentLine.trim()) {
+    pageText += currentLine.trim() + '\n';
+  }
+  
+  // Clean up multiple consecutive line breaks (convert to paragraph breaks)
+  pageText = pageText.replace(/\n\n+/g, '\n\n');
+  
+  return pageText + '\n\n';
+}
+
+// ===== IMAGE IMPORT AND MANIPULATION FUNCTIONS =====
+async function handlePngImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
+  if (!validTypes.includes(file.type)) {
+    showNotification('❌ Please select a valid image file (PNG, JPG, or WebP)');
+    return;
+  }
+
+  try {
+    showNotification('📥 Loading image...');
+    const imageData = await readImageFile(file);
+    
+    // Create image object with default size
+    const newImage = {
+      id: Date.now(),
+      src: imageData,
+      x: 50,
+      y: 50,
+      width: 200,
+      height: 150,
+      img: null // Will store the loaded Image object
+    };
+
+    // Load the image
+    const img = new Image();
+    img.onload = () => {
+      newImage.img = img;
+      // Maintain aspect ratio
+      const aspectRatio = img.width / img.height;
+      newImage.height = 150;
+      newImage.width = 150 * aspectRatio;
+      
+      canvasImages.push(newImage);
+      redrawCanvas();
+      showNotification(`✅ Image imported (${Math.round(newImage.width)}x${Math.round(newImage.height)})`);
+    };
+    img.onerror = () => {
+      showNotification('❌ Failed to load image');
+    };
+    img.src = imageData;
+  } catch (error) {
+    console.error('Image import error:', error);
+    showNotification('❌ Failed to import image: ' + error.message);
+  }
+
+  // Reset file input
+  document.getElementById('pngFileInput').value = '';
+}
+
+async function readImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      resolve(e.target.result);
+    };
+    
+    reader.onerror = () => {
+      reject(new Error('Failed to read image file'));
+    };
+    
+    reader.readAsDataURL(file);
+  });
+}
+
+// Enhanced canvas drawing to include images
+function redrawCanvas() {
+  // Restore the canvas snapshot (drawing content) if it exists
+  if (canvasSnapshot) {
+    ctx.putImageData(canvasSnapshot, 0, 0);
+  } else {
+    // If no snapshot, clear to white (initial state)
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // Draw all images on top
+  for (let imgObj of canvasImages) {
+    if (imgObj.img && imgObj.img.complete) {
+      ctx.drawImage(imgObj.img, imgObj.x, imgObj.y, imgObj.width, imgObj.height);
+      
+      // Draw selection border if selected
+      if (selectedImage && selectedImage.id === imgObj.id) {
+        ctx.strokeStyle = '#2196F3';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(imgObj.x, imgObj.y, imgObj.width, imgObj.height);
+        
+        // Draw resize handle
+        const handleSize = 12;
+        ctx.fillStyle = '#2196F3';
+        ctx.fillRect(
+          imgObj.x + imgObj.width - handleSize,
+          imgObj.y + imgObj.height - handleSize,
+          handleSize,
+          handleSize
+        );
+      }
+    }
+  }
+}
+
+// Detect if click is on an image
+function getImageAtPoint(x, y) {
+  // Check from top to bottom (last drawn = last in array)
+  for (let i = canvasImages.length - 1; i >= 0; i--) {
+    const img = canvasImages[i];
+    if (x >= img.x && x <= img.x + img.width && 
+        y >= img.y && y <= img.y + img.height) {
+      return img;
+    }
+  }
+  return null;
+}
+
+// Check if clicking on resize handle
+function isOnResizeHandle(imgObj, x, y) {
+  if (!imgObj) return false;
+  const handleSize = 12;
+  const handleX = imgObj.x + imgObj.width - handleSize;
+  const handleY = imgObj.y + imgObj.height - handleSize;
+  return x >= handleX && x <= handleX + handleSize &&
+         y >= handleY && y <= handleY + handleSize;
+}
+
+// Modified canvas mouse down to handle images
+function canvasMouseDown(e) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+  // Check if clicking on an image
+  const clickedImage = getImageAtPoint(x, y);
+  
+  if (clickedImage) {
+    // Don't save snapshot when dragging images - just clear drawing while dragging
+    // The snapshot will be updated when drawing finishes (in canvasMouseUp)
+    
+    selectedImage = clickedImage;
+    
+    // Check if clicking on resize handle
+    if (isOnResizeHandle(clickedImage, x, y)) {
+      isResizingImage = true;
+    } else {
+      isDraggingImage = true;
+      dragOffsetX = x - clickedImage.x;
+      dragOffsetY = y - clickedImage.y;
+    }
+    redrawCanvas();
+    return;
+  }
+
+  // If not clicking on image, start drawing
+  selectedImage = null;
+  isDraggingImage = false;
+  isResizingImage = false;
+  
+  if (currentTool === 'pencil' || currentTool === 'eraser' || currentTool === 'text') {
+    isDrawing = true;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    startX = (e.clientX - rect.left) * scaleX;
+    startY = (e.clientY - rect.top) * scaleY;
+
+    if (currentTool === 'pencil' || currentTool === 'eraser') {
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+    }
+  } else if (
+    currentTool === 'rectangle' ||
+    currentTool === 'circle' ||
+    currentTool === 'line' ||
+    currentTool === 'arrow'
+  ) {
+    // For shapes, start drawing
+    isDrawing = true;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    startX = (e.clientX - rect.left) * scaleX;
+    startY = (e.clientY - rect.top) * scaleY;
+  }
+}
+
+// Modified canvas mouse move to handle image dragging/resizing
+function canvasMouseMove(e) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+  if (isDraggingImage && selectedImage) {
+    selectedImage.x = x - dragOffsetX;
+    selectedImage.y = y - dragOffsetY;
+    redrawCanvas();
+    return;
+  }
+
+  if (isResizingImage && selectedImage) {
+    const newWidth = Math.max(50, x - selectedImage.x);
+    const newHeight = Math.max(50, y - selectedImage.y);
+    selectedImage.width = newWidth;
+    selectedImage.height = newHeight;
+    redrawCanvas();
+    return;
+  }
+
+  // Normal drawing
+  if (!isDrawing) return;
+
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const drawX = (e.clientX - rect.left) * scaleX;
+  const drawY = (e.clientY - rect.top) * scaleY;
+
+  // Restore snapshot and redraw images to ensure they stay on top
+  if (canvasImages.length > 0) {
+    if (canvasSnapshot) {
+      ctx.putImageData(canvasSnapshot, 0, 0);
+    }
+    // Redraw all images
+    for (let imgObj of canvasImages) {
+      if (imgObj.img && imgObj.img.complete) {
+        ctx.drawImage(imgObj.img, imgObj.x, imgObj.y, imgObj.width, imgObj.height);
+      }
+    }
+  }
+
+  ctx.lineWidth = currentSize;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  if (currentTool === 'pencil') {
+    ctx.strokeStyle = currentColor;
+    ctx.lineTo(drawX, drawY);
+    ctx.stroke();
+  } else if (currentTool === 'eraser') {
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = currentSize * 3;
+    ctx.lineTo(drawX, drawY);
+    ctx.stroke();
+  } else if (
+    currentTool === 'rectangle' ||
+    currentTool === 'circle' ||
+    currentTool === 'line' ||
+    currentTool === 'arrow'
+  ) {
+    // For shape preview: restore drawing snapshot and redraw images on top
+    if (canvasSnapshot) {
+      ctx.putImageData(canvasSnapshot, 0, 0);
+    } else {
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    
+    // Redraw all images
+    for (let imgObj of canvasImages) {
+      if (imgObj.img && imgObj.img.complete) {
+        ctx.drawImage(imgObj.img, imgObj.x, imgObj.y, imgObj.width, imgObj.height);
+      }
+    }
+
+    ctx.strokeStyle = currentColor;
+    ctx.lineWidth = currentSize;
+
+    if (currentTool === 'rectangle') {
+      ctx.strokeRect(startX, startY, drawX - startX, drawY - startY);
+    } else if (currentTool === 'circle') {
+      const radius = Math.sqrt(
+        Math.pow(drawX - startX, 2) + Math.pow(drawY - startY, 2)
+      );
+      ctx.beginPath();
+      ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+      ctx.stroke();
+    } else if (currentTool === 'line') {
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(drawX, drawY);
+      ctx.stroke();
+    } else if (currentTool === 'arrow') {
+      drawArrow(startX, startY, drawX, drawY);
+    }
+  }
+}
+
+// Modified canvas mouse up to handle image operations
+function canvasMouseUp(e) {
+  if (isDraggingImage || isResizingImage) {
+    isDraggingImage = false;
+    isResizingImage = false;
+    redrawCanvas();
+    return;
+  }
+
+  // After drawing finishes, save ONLY the drawing part (not images)
+  if (isDrawing) {
+    isDrawing = false;
+    
+    // Handle text tool
+    if (currentTool === 'text') {
+      const text = prompt("Enter text:");
+      if (text) {
+        ctx.fillStyle = currentColor;
+        ctx.font = `${currentSize * 10}px Arial`;
+        ctx.fillText(text, startX, startY);
+      }
+    }
+    
+    // Capture what's currently on canvas
+    const currentCanvas = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    
+    // If there are images on canvas, we need to remove them from the snapshot
+    // by creating a new image data with those areas white
+    if (canvasImages.length > 0) {
+      const drawingOnly = ctx.createImageData(canvas.width, canvas.height);
+      const drawingData = drawingOnly.data;
+      const currentData = currentCanvas.data;
+      
+      // Start with a copy of current canvas
+      for (let i = 0; i < currentData.length; i++) {
+        drawingData[i] = currentData[i];
+      }
+      
+      // Replace image areas with white
+      for (let imgObj of canvasImages) {
+        const x1 = Math.max(0, Math.floor(imgObj.x));
+        const y1 = Math.max(0, Math.floor(imgObj.y));
+        const x2 = Math.min(canvas.width, Math.ceil(imgObj.x + imgObj.width));
+        const y2 = Math.min(canvas.height, Math.ceil(imgObj.y + imgObj.height));
+        
+        for (let py = y1; py < y2; py++) {
+          for (let px = x1; px < x2; px++) {
+            const idx = (py * canvas.width + px) * 4;
+            drawingData[idx] = 255;     // R - white
+            drawingData[idx + 1] = 255; // G - white
+            drawingData[idx + 2] = 255; // B - white
+            drawingData[idx + 3] = 255; // A - opaque
+          }
+        }
+      }
+      
+      canvasSnapshot = drawingOnly;
+    } else {
+      // No images, just save the drawing as-is
+      canvasSnapshot = currentCanvas;
+    }
+    
+    // Redraw to show final result with images on top
+    redrawCanvas();
+  }
+}
+
+// Delete selected image
+function deleteSelectedImage() {
+  if (selectedImage) {
+    canvasImages = canvasImages.filter(img => img.id !== selectedImage.id);
+    selectedImage = null;
+    redrawCanvas();
+    showNotification('🗑️ Image deleted');
+  }
+}
+
+// Update drawing functions to preserve images
+function clearCanvas() {
+  if (confirm('Clear the entire canvas? Images will also be cleared.')) {
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    canvasImages = [];
+    selectedImage = null;
+    canvasSnapshot = null;
   }
 }
