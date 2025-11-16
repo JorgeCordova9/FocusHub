@@ -2174,6 +2174,12 @@ function renderTaskDashboard() {
   const container = document.getElementById("tasksList");
   const emptyState = document.getElementById("emptyTaskState");
 
+  // Calculate task statistics
+  const pendingCount = appData.tasks.filter(t => t.status !== "completed").length;
+  const completedCount = appData.tasks.filter(t => t.status === "completed").length;
+  document.getElementById("pendingTaskCount").textContent = pendingCount;
+  document.getElementById("completedTaskCount").textContent = completedCount;
+
   if (appData.tasks.length === 0) {
     container.style.display = "none";
     emptyState.style.display = "block";
