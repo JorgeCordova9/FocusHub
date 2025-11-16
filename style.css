@@ -895,6 +895,26 @@ body {
   gap: var(--space-24);
 }
 
+.logout-btn {
+  background: var(--color-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  transition: all var(--duration-normal);
+  box-shadow: var(--shadow-sm);
+}
+
+.logout-btn:hover {
+  background: var(--color-secondary-hover);
+}
+
+.logout-btn:active {
+  background: var(--color-secondary-active);
+}
+
 .app-title {
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
@@ -1346,6 +1366,7 @@ body {
 
 .content-area.expanded {
   margin-left: 0;
+  padding-left: 70px;
 }
 
 .module {
