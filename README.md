@@ -220,6 +220,7 @@ MIT License - Feel free to fork, modify, and learn!
 ## 👥 The Team
 
 Built by students who understand the struggle of staying focused.
+Jorge Cordova, Israel Alcantara and Carlos Bernaus.
 
 **Questions? Issues? Feedback?**
 - Open an issue on GitHub
