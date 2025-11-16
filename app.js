@@ -19,7 +19,7 @@ let appData = {
     currentStreak: 0,
   },
   dailyGoal: {
-    targetMinutes: 60,
+    targetMinutes: 10,
     completedMinutes: 0,
   },
   currentTask: null,
@@ -970,9 +970,7 @@ function updateTopTimerDisplay() {
     // Update countdown
     const minutes = Math.floor(appData.pomodoroTimer.remainingSeconds / 60);
     const seconds = appData.pomodoroTimer.remainingSeconds % 60;
-    document.getElementById("timerText").textContent = `${minutes
-      .toString()
-      .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+    document.getElementById("timerText").textContent = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 
     // Update phase
     document.getElementById("timerPhase").textContent = appData.pomodoroTimer
@@ -1630,22 +1628,58 @@ let aiChatState = {
   conversationHistory: [], // For API context
 };
 
+function saveAIChatToStorage() {
+  // Save AI chat tied to current task
+  if (appData.currentTask) {
+    const key = `aiChat_${appData.currentTask}`;
+    sessionStorage.setItem(key, JSON.stringify(aiChatState));
+  }
+}
+
+function loadAIChatFromStorage() {
+  // Load AI chat for current task
+  if (appData.currentTask) {
+    const key = `aiChat_${appData.currentTask}`;
+    const stored = sessionStorage.getItem(key);
+    if (stored) {
+      try {
+        aiChatState = JSON.parse(stored);
+      } catch (e) {
+        aiChatState = { messages: [], conversationHistory: [] };
+      }
+    } else {
+      // No stored chat for this task, start fresh
+      aiChatState = { messages: [], conversationHistory: [] };
+    }
+  } else {
+    // No current task, reset
+    aiChatState = { messages: [], conversationHistory: [] };
+  }
+}
+
 function initializeAI() {
-  aiChatState.messages = [];
-  aiChatState.conversationHistory = [];
+  loadAIChatFromStorage();
   const chatMessages = document.getElementById("aiChatMessages");
-  chatMessages.innerHTML = `
-    <div class="ai-message-welcome">
-      <h3>Welcome to AI Study Assistant! 📚</h3>
-      <p>Ask me any questions about your study topics. I'm here to help clarify concepts, explain ideas, and provide study tips.</p>
-      <div class="example-questions">
-        <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: 12px;">Example questions:</p>
-        <button class="example-btn" onclick="aiAskQuestion('What are the main causes of World War II?')">What are the main causes of World War II?</button>
-        <button class="example-btn" onclick="aiAskQuestion('Explain photosynthesis in simple terms')">Explain photosynthesis in simple terms</button>
-        <button class="example-btn" onclick="aiAskQuestion('How do I solve quadratic equations?')">How do I solve quadratic equations?</button>
+  
+  if (aiChatState.messages.length > 0) {
+    chatMessages.innerHTML = "";
+    aiChatState.messages.forEach((msg) => {
+      displayAIMessage(msg.role, msg.content);
+    });
+  } else {
+    chatMessages.innerHTML = `
+      <div class="ai-message-welcome">
+        <h3>Welcome to AI Study Assistant! 📚</h3>
+        <p>Ask me any questions about your study topics. I'm here to help clarify concepts, explain ideas, and provide study tips.</p>
+        <div class="example-questions">
+          <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: 12px;">Example questions:</p>
+          <button class="example-btn" onclick="aiAskQuestion('What are the main causes of World War II?')">What are the main causes of World War II?</button>
+          <button class="example-btn" onclick="aiAskQuestion('Explain photosynthesis in simple terms')">Explain photosynthesis in simple terms</button>
+          <button class="example-btn" onclick="aiAskQuestion('How do I solve quadratic equations?')">How do I solve quadratic equations?</button>
+        </div>
       </div>
-    </div>
-  `;
+    `;
+  }
 }
 
 function aiAskQuestion(question) {
@@ -1661,6 +1695,8 @@ function aiSendMessage() {
 
   // Add user message to state and display
   aiChatState.messages.push({ role: "user", content: message });
+  aiChatState.conversationHistory.push({ role: "user", content: message });
+  saveAIChatToStorage();
   displayAIMessage("user", message);
 
   // Clear input
@@ -1732,44 +1768,58 @@ function formatAIResponse(text) {
 
 async function getAIResponse(userMessage) {
   const statusDiv = document.getElementById("aiChatStatus");
-  statusDiv.textContent = "Getting response...";
+  statusDiv.textContent = "Getting response from AI...";
 
   try {
-    // Using Hugging Face Inference API with free model
-    // You can use this without authentication for basic use
-    const response = await fetch(
-      "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1",
-      {
-        headers: {
-          Authorization: `Bearer hf_placeholder`, // Free tier allows some requests
-        },
-        method: "POST",
-        body: JSON.stringify({
-          inputs: formatPrompt(userMessage),
-          parameters: {
-            max_length: 512,
-            temperature: 0.7,
-          },
-        }),
-      }
-    );
+    // Using Groq's free API with Mixtral - a real, open-source LLM
+    const GROQ_API_KEY = "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";
+
+    // Prepare conversation history for context
+    const systemMessage = {
+      role: "system",
+      content:
+        "You are a helpful study assistant. Answer questions clearly and concisely. Help students understand concepts, solve problems, and provide study tips. Format your responses in a clear, organized manner.",
+    };
+
+    const messages = [systemMessage];
+
+    // Add conversation history (excluding system message)
+    aiChatState.conversationHistory.forEach((msg) => {
+      messages.push({
+        role: msg.role,
+        content: msg.content,
+      });
+    });
+
+    messages.push({ role: "user", content: userMessage });
+
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant", // Fast, reliable production model
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 1024,
+      }),
+    });
 
     if (!response.ok) {
-      throw new Error("API request failed");
+      const errorData = await response.json();
+      if (response.status === 401) {
+        throw new Error(
+          "API key error. Please contact support."
+        );
+      }
+      throw new Error(errorData.error?.message || "API request failed");
     }
 
-    const result = await response.json();
-
-    // Extract generated text
-    let assistantMessage = "";
-    if (result[0] && result[0].generated_text) {
-      assistantMessage = result[0].generated_text
-        .replace(/.*?Assistant:/s, "") // Remove prompt
-        .trim();
-    } else {
-      assistantMessage =
-        "I encountered an issue processing your request. Please try again.";
-    }
+    const data = await response.json();
+    const assistantMessage =
+      data.choices[0]?.message?.content || "No response received";
 
     // Remove loading indicator
     const loader = document.querySelector(".ai-loading-indicator");
@@ -1777,68 +1827,33 @@ async function getAIResponse(userMessage) {
       loader.parentElement.remove();
     }
 
+    // Update conversation history and save to storage
     aiChatState.messages.push({ role: "assistant", content: assistantMessage });
-    aiChatState.conversationHistory.push({
-      role: "user",
-      content: userMessage,
-    });
     aiChatState.conversationHistory.push({
       role: "assistant",
       content: assistantMessage,
     });
+    saveAIChatToStorage();
 
     displayAIMessage("assistant", assistantMessage);
     statusDiv.textContent = "";
   } catch (error) {
+    console.error("AI Error:", error);
+
     // Remove loading indicator
     const loader = document.querySelector(".ai-loading-indicator");
     if (loader) {
       loader.parentElement.remove();
     }
 
-    // Fallback response when API fails (offline or rate limited)
-    const fallbackResponse = generateOfflineAIResponse(userMessage);
-    aiChatState.messages.push({ role: "assistant", content: fallbackResponse });
-    displayAIMessage("assistant", fallbackResponse);
+    // Show error message
+    const errorMessage = `⚠️ Error: ${error.message}\n\nIf the issue persists, please try again in a moment.`;
 
-    statusDiv.textContent = "Using offline response (API unavailable)";
-    setTimeout(() => {
-      statusDiv.textContent = "";
-    }, 5000);
+    aiChatState.messages.push({ role: "assistant", content: errorMessage });
+    displayAIMessage("assistant", errorMessage);
+
+    statusDiv.textContent = "";
   }
-}
-
-function formatPrompt(userMessage) {
-  return `You are a helpful study assistant. Answer the following question clearly and concisely, providing helpful information for a student.
-
-User: ${userMessage}
-Assistant:`;
-}
-
-function generateOfflineAIResponse(question) {
-  // Simple offline responses based on keywords
-  const lowerQuestion = question.toLowerCase();
-
-  if (
-    lowerQuestion.includes("photosynthesis") ||
-    lowerQuestion.includes("plants")
-  ) {
-    return "**Photosynthesis** is the process by which plants convert light energy into chemical energy stored in glucose. It occurs in two stages:\n\n**Light-dependent reactions** (in thylakoids): Chlorophyll absorbs light, splitting water molecules and releasing oxygen. This produces ATP and NADPH.\n\n**Light-independent reactions (Calvin Cycle)** (in stroma): Uses ATP and NADPH to convert CO₂ into glucose through a series of enzyme-catalyzed reactions.\n\nThe simplified equation is: 6CO₂ + 6H₂O + light → C₆H₁₂O₆ + 6O₂\n\nThis is essential for life on Earth as it provides oxygen and organic compounds!";
-  }
-
-  if (
-    lowerQuestion.includes("quadratic") ||
-    lowerQuestion.includes("equation")
-  ) {
-    return "**Solving Quadratic Equations:**\n\nA quadratic equation has the form: ax² + bx + c = 0\n\n**Three main methods:**\n\n1. **Factoring**: Break into two binomials and set each to zero\n2. **Quadratic Formula**: x = (-b ± √(b²-4ac)) / 2a\n3. **Completing the Square**: Rearrange to make a perfect square\n\nThe **discriminant** (b²-4ac) tells you:\n- Positive: Two distinct real solutions\n- Zero: One repeated solution\n- Negative: No real solutions (complex numbers)\n\nThe quadratic formula works for all quadratic equations!";
-  }
-
-  if (lowerQuestion.includes("world war")) {
-    return "**Main Causes of World War II:**\n\n1. **Treaty of Versailles**: Harsh terms on Germany created resentment and economic hardship\n\n2. **Economic Crisis**: The Great Depression destabilized governments and economies\n\n3. **Rise of Totalitarianism**: Hitler, Mussolini, and militarists gained power through nationalist rhetoric\n\n4. **Failure of League of Nations**: Couldn't prevent aggression in Manchuria and Abyssinia\n\n5. **Appeasement Policy**: Britain and France allowed German expansion unchecked\n\n6. **Territorial Ambitions**: Germany wanted Lebensraum (living space); Japan wanted natural resources\n\n7. **Ideological Conflicts**: Fascism vs. Democracy and Communism\n\nThese factors combined to create conditions for global conflict!";
-  }
-
-  // Generic helpful response
-  return `That's a great question! To give you the best answer, here are some tips for studying this topic:\n\n**1. Break it down**: Divide the concept into smaller parts\n**2. Use examples**: Find real-world applications\n**3. Create mnemonics**: Make acronyms to remember key points\n**4. Teach others**: Explaining to someone else reinforces learning\n**5. Practice problems**: Apply what you've learned\n**6. Review regularly**: Spaced repetition helps retention\n\nI'm working with limited offline data right now. For more detailed information about "${question}", try searching your textbook or course materials!\n\nKeep up the great studying!`;
 }
 
 // ===== TASK-SPECIFIC NOTES FUNCTIONS =====
