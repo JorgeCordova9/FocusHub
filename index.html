@@ -153,6 +153,10 @@
         <span class="nav-icon">🎵</span>
         <span>Music</span>
       </button>
+      <button class="nav-btn" onclick="switchTaskModule('ai')">
+        <span class="nav-icon">🤖</span>
+        <span>AI Assistant</span>
+      </button>
       <div style="padding: var(--space-16); margin-top: auto; border-top: 1px solid var(--color-card-border);">
         <button class="btn btn--secondary" style="width: 100%;" onclick="exitTaskWorkspace()">← Exit Task</button>
       </div>
@@ -505,6 +509,44 @@
                 allowfullscreen>
               </iframe>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Assistant Module -->
+      <div id="aiModule" class="module">
+        <div class="module-header">
+          <h2>🤖 AI Study Assistant</h2>
+        </div>
+
+        <div class="ai-chat-container">
+          <!-- Chat Messages Area -->
+          <div class="ai-chat-messages" id="aiChatMessages">
+            <div class="ai-message-welcome">
+              <h3>Welcome to AI Study Assistant! 📚</h3>
+              <p>Ask me any questions about your study topics. I'm here to help clarify concepts, explain ideas, and provide study tips.</p>
+              <div class="example-questions">
+                <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: 12px;">Example questions:</p>
+                <button class="example-btn" onclick="aiAskQuestion('What are the main causes of World War II?')">What are the main causes of World War II?</button>
+                <button class="example-btn" onclick="aiAskQuestion('Explain photosynthesis in simple terms')">Explain photosynthesis in simple terms</button>
+                <button class="example-btn" onclick="aiAskQuestion('How do I solve quadratic equations?')">How do I solve quadratic equations?</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Input Area -->
+          <div class="ai-chat-input-area">
+            <div style="display: flex; gap: var(--space-12);">
+              <input 
+                type="text" 
+                id="aiChatInput" 
+                class="ai-chat-input" 
+                placeholder="Ask anything about your study topic..."
+                onkeydown="if(event.key === 'Enter') aiSendMessage()"
+              >
+              <button class="btn btn--primary" onclick="aiSendMessage()" style="padding: 0 24px;">Send</button>
+            </div>
+            <div class="ai-chat-status" id="aiChatStatus"></div>
           </div>
         </div>
       </div>

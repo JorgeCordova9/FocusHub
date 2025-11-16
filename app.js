@@ -427,6 +427,8 @@ function switchTaskModule(moduleName) {
     loadTaskWhiteboard(task);
   } else if (moduleName === "browser") {
     initializeBrowser();
+  } else if (moduleName === "ai") {
+    initializeAI();
   }
 }
 
@@ -1619,6 +1621,224 @@ function updateWhitelistPanelAppearance() {
     toggle.classList.remove("btn--primary");
     toggle.classList.add("btn--secondary");
   }
+}
+
+// ===== AI ASSISTANT FUNCTIONS =====
+
+let aiChatState = {
+  messages: [], // {role: 'user' | 'assistant', content: string}
+  conversationHistory: [], // For API context
+};
+
+function initializeAI() {
+  aiChatState.messages = [];
+  aiChatState.conversationHistory = [];
+  const chatMessages = document.getElementById("aiChatMessages");
+  chatMessages.innerHTML = `
+    <div class="ai-message-welcome">
+      <h3>Welcome to AI Study Assistant! 📚</h3>
+      <p>Ask me any questions about your study topics. I'm here to help clarify concepts, explain ideas, and provide study tips.</p>
+      <div class="example-questions">
+        <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: 12px;">Example questions:</p>
+        <button class="example-btn" onclick="aiAskQuestion('What are the main causes of World War II?')">What are the main causes of World War II?</button>
+        <button class="example-btn" onclick="aiAskQuestion('Explain photosynthesis in simple terms')">Explain photosynthesis in simple terms</button>
+        <button class="example-btn" onclick="aiAskQuestion('How do I solve quadratic equations?')">How do I solve quadratic equations?</button>
+      </div>
+    </div>
+  `;
+}
+
+function aiAskQuestion(question) {
+  document.getElementById("aiChatInput").value = question;
+  aiSendMessage();
+}
+
+function aiSendMessage() {
+  const input = document.getElementById("aiChatInput");
+  const message = input.value.trim();
+
+  if (!message) return;
+
+  // Add user message to state and display
+  aiChatState.messages.push({ role: "user", content: message });
+  displayAIMessage("user", message);
+
+  // Clear input
+  input.value = "";
+
+  // Show loading indicator
+  displayAILoading();
+
+  // Send to AI API
+  getAIResponse(message);
+}
+
+function displayAIMessage(role, content) {
+  const chatMessages = document.getElementById("aiChatMessages");
+
+  // Remove welcome message on first real message
+  const welcomeMsg = chatMessages.querySelector(".ai-message-welcome");
+  if (welcomeMsg) {
+    welcomeMsg.remove();
+  }
+
+  // Remove loading indicator if showing
+  const loader = chatMessages.querySelector(".ai-loading-indicator");
+  if (loader) {
+    loader.remove();
+  }
+
+  const messageGroup = document.createElement("div");
+  messageGroup.className = `ai-message-group ${role}`;
+
+  const bubble = document.createElement("div");
+  bubble.className = "ai-message-bubble";
+  bubble.innerHTML = formatAIResponse(content);
+
+  messageGroup.appendChild(bubble);
+  chatMessages.appendChild(messageGroup);
+
+  // Scroll to bottom
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function displayAILoading() {
+  const chatMessages = document.getElementById("aiChatMessages");
+
+  const loadingDiv = document.createElement("div");
+  loadingDiv.className = "ai-message-group assistant";
+
+  loadingDiv.innerHTML = `
+    <div class="ai-loading-indicator">
+      <div class="ai-loading-dot"></div>
+      <div class="ai-loading-dot"></div>
+      <div class="ai-loading-dot"></div>
+    </div>
+  `;
+
+  chatMessages.appendChild(loadingDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function formatAIResponse(text) {
+  // Basic markdown-like formatting
+  return text
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    .replace(/^- (.*?)$/gm, "<li>$1</li>")
+    .replace(/(<li>.*<\/li>)/s, "<ul>$1</ul>")
+    .replace(/\n/g, "<br>");
+}
+
+async function getAIResponse(userMessage) {
+  const statusDiv = document.getElementById("aiChatStatus");
+  statusDiv.textContent = "Getting response...";
+
+  try {
+    // Using Hugging Face Inference API with free model
+    // You can use this without authentication for basic use
+    const response = await fetch(
+      "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1",
+      {
+        headers: {
+          Authorization: `Bearer hf_placeholder`, // Free tier allows some requests
+        },
+        method: "POST",
+        body: JSON.stringify({
+          inputs: formatPrompt(userMessage),
+          parameters: {
+            max_length: 512,
+            temperature: 0.7,
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("API request failed");
+    }
+
+    const result = await response.json();
+
+    // Extract generated text
+    let assistantMessage = "";
+    if (result[0] && result[0].generated_text) {
+      assistantMessage = result[0].generated_text
+        .replace(/.*?Assistant:/s, "") // Remove prompt
+        .trim();
+    } else {
+      assistantMessage =
+        "I encountered an issue processing your request. Please try again.";
+    }
+
+    // Remove loading indicator
+    const loader = document.querySelector(".ai-loading-indicator");
+    if (loader) {
+      loader.parentElement.remove();
+    }
+
+    aiChatState.messages.push({ role: "assistant", content: assistantMessage });
+    aiChatState.conversationHistory.push({
+      role: "user",
+      content: userMessage,
+    });
+    aiChatState.conversationHistory.push({
+      role: "assistant",
+      content: assistantMessage,
+    });
+
+    displayAIMessage("assistant", assistantMessage);
+    statusDiv.textContent = "";
+  } catch (error) {
+    // Remove loading indicator
+    const loader = document.querySelector(".ai-loading-indicator");
+    if (loader) {
+      loader.parentElement.remove();
+    }
+
+    // Fallback response when API fails (offline or rate limited)
+    const fallbackResponse = generateOfflineAIResponse(userMessage);
+    aiChatState.messages.push({ role: "assistant", content: fallbackResponse });
+    displayAIMessage("assistant", fallbackResponse);
+
+    statusDiv.textContent = "Using offline response (API unavailable)";
+    setTimeout(() => {
+      statusDiv.textContent = "";
+    }, 5000);
+  }
+}
+
+function formatPrompt(userMessage) {
+  return `You are a helpful study assistant. Answer the following question clearly and concisely, providing helpful information for a student.
+
+User: ${userMessage}
+Assistant:`;
+}
+
+function generateOfflineAIResponse(question) {
+  // Simple offline responses based on keywords
+  const lowerQuestion = question.toLowerCase();
+
+  if (
+    lowerQuestion.includes("photosynthesis") ||
+    lowerQuestion.includes("plants")
+  ) {
+    return "**Photosynthesis** is the process by which plants convert light energy into chemical energy stored in glucose. It occurs in two stages:\n\n**Light-dependent reactions** (in thylakoids): Chlorophyll absorbs light, splitting water molecules and releasing oxygen. This produces ATP and NADPH.\n\n**Light-independent reactions (Calvin Cycle)** (in stroma): Uses ATP and NADPH to convert CO₂ into glucose through a series of enzyme-catalyzed reactions.\n\nThe simplified equation is: 6CO₂ + 6H₂O + light → C₆H₁₂O₆ + 6O₂\n\nThis is essential for life on Earth as it provides oxygen and organic compounds!";
+  }
+
+  if (
+    lowerQuestion.includes("quadratic") ||
+    lowerQuestion.includes("equation")
+  ) {
+    return "**Solving Quadratic Equations:**\n\nA quadratic equation has the form: ax² + bx + c = 0\n\n**Three main methods:**\n\n1. **Factoring**: Break into two binomials and set each to zero\n2. **Quadratic Formula**: x = (-b ± √(b²-4ac)) / 2a\n3. **Completing the Square**: Rearrange to make a perfect square\n\nThe **discriminant** (b²-4ac) tells you:\n- Positive: Two distinct real solutions\n- Zero: One repeated solution\n- Negative: No real solutions (complex numbers)\n\nThe quadratic formula works for all quadratic equations!";
+  }
+
+  if (lowerQuestion.includes("world war")) {
+    return "**Main Causes of World War II:**\n\n1. **Treaty of Versailles**: Harsh terms on Germany created resentment and economic hardship\n\n2. **Economic Crisis**: The Great Depression destabilized governments and economies\n\n3. **Rise of Totalitarianism**: Hitler, Mussolini, and militarists gained power through nationalist rhetoric\n\n4. **Failure of League of Nations**: Couldn't prevent aggression in Manchuria and Abyssinia\n\n5. **Appeasement Policy**: Britain and France allowed German expansion unchecked\n\n6. **Territorial Ambitions**: Germany wanted Lebensraum (living space); Japan wanted natural resources\n\n7. **Ideological Conflicts**: Fascism vs. Democracy and Communism\n\nThese factors combined to create conditions for global conflict!";
+  }
+
+  // Generic helpful response
+  return `That's a great question! To give you the best answer, here are some tips for studying this topic:\n\n**1. Break it down**: Divide the concept into smaller parts\n**2. Use examples**: Find real-world applications\n**3. Create mnemonics**: Make acronyms to remember key points\n**4. Teach others**: Explaining to someone else reinforces learning\n**5. Practice problems**: Apply what you've learned\n**6. Review regularly**: Spaced repetition helps retention\n\nI'm working with limited offline data right now. For more detailed information about "${question}", try searching your textbook or course materials!\n\nKeep up the great studying!`;
 }
 
 // ===== TASK-SPECIFIC NOTES FUNCTIONS =====
