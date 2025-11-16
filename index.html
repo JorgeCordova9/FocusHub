@@ -170,6 +170,16 @@
           <!-- Tasks List (Left) -->
           <div style="flex: 1; min-width: 0;">
             <div id="tasksList" class="tasks-list"></div>
+            
+            <!-- Empty State - Inside flex container for proper alignment -->
+            <div id="emptyTaskState" style="display: none; text-align: center; padding: 60px 20px;">
+              <div style="font-size: 64px; margin-bottom: 24px;">📋</div>
+              <h3 style="margin-bottom: 16px; color: var(--color-text);">No tasks yet</h3>
+              <p style="color: var(--color-text-secondary); margin-bottom: 24px; max-width: 500px; margin-left: auto; margin-right: auto;">
+                Create your first task to get started with focused work sessions
+              </p>
+              <button class="btn btn--primary" onclick="showCreateTaskForm()">+ Create First Task</button>
+            </div>
           </div>
           
           <!-- Daily Study Goal (Right) -->
@@ -198,16 +208,6 @@
               </div>
             </div>
           </div>
-        </div>
-        
-        <!-- Empty State - POSITIONED HIGHER -->
-        <div id="emptyTaskState" style="display: none; text-align: center; padding: 60px 20px; margin-top: -80px;">
-          <div style="font-size: 64px; margin-bottom: 24px;">📋</div>
-          <h3 style="margin-bottom: 16px; color: var(--color-text);">No tasks yet</h3>
-          <p style="color: var(--color-text-secondary); margin-bottom: 24px; max-width: 500px; margin-left: auto; margin-right: auto;">
-            Create your first task to get started with focused work sessions
-          </p>
-          <button class="btn btn--primary" onclick="showCreateTaskForm()">+ Create First Task</button>
         </div>
       </div>
 
