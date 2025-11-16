@@ -1016,6 +1016,8 @@ let browserState = {
   tabs: [],
   activeTabId: null,
   nextTabId: 1,
+  allowedLinks: [], // Whitelist of allowed links
+  whitelistActive: false, // Toggle for whitelist restriction (defaults to false/disabled)
 };
 
 function initializeBrowser() {
@@ -1035,6 +1037,14 @@ function initializeBrowser() {
   if (browserState.activeTabId) {
     displayTabInfo(browserState.activeTabId);
   }
+
+  // Render allowed links list
+  renderAllowedLinks();
+  
+  // Ensure whitelist appearance is applied after DOM has updated
+  setTimeout(() => {
+    updateWhitelistPanelAppearance();
+  }, 0);
 }
 
 function createNewTab(query = "", title = "New Search") {
@@ -1486,6 +1496,128 @@ function copyCitation() {
     alert("Citation copied! You can now insert it into your notes.");
   } else {
     alert("No active search to cite.");
+  }
+}
+
+// ===== LINK WHITELIST MANAGEMENT =====
+
+function addAllowedLink() {
+  const input = document.getElementById("newLinkInput");
+  const linkName = input.value.trim();
+
+  if (!linkName) {
+    alert("Please enter a link name (e.g., Wikipedia, Python Docs)");
+    return;
+  }
+
+  // Check if link already exists
+  if (browserState.allowedLinks.find((link) => link.name.toLowerCase() === linkName.toLowerCase())) {
+    alert("This link already exists!");
+    return;
+  }
+
+  // Add new link
+  browserState.allowedLinks.push({
+    id: Date.now(),
+    name: linkName,
+    addedDate: new Date().toLocaleString(),
+  });
+
+  input.value = "";
+  renderAllowedLinks();
+}
+
+function removeAllowedLink(linkId) {
+  browserState.allowedLinks = browserState.allowedLinks.filter(
+    (link) => link.id !== linkId
+  );
+  renderAllowedLinks();
+}
+
+function renderAllowedLinks() {
+  const linksList = document.getElementById("allowedLinksList");
+  const emptyState = document.getElementById("emptyLinksState");
+
+  if (browserState.allowedLinks.length === 0) {
+    linksList.innerHTML = "";
+    emptyState.style.display = "block";
+    return;
+  }
+
+  emptyState.style.display = "none";
+  linksList.innerHTML = browserState.allowedLinks
+    .map(
+      (link) => `
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-8); background-color: rgba(33, 128, 141, 0.1); border-radius: var(--radius-md); border: 1px solid var(--color-card-border);">
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: var(--font-size-sm); font-weight: 500; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(
+          link.name
+        )}</div>
+        <div style="font-size: 11px; color: var(--color-text-secondary);">Added ${new Date(
+          link.addedDate
+        ).toLocaleDateString()}</div>
+      </div>
+      <button class="btn btn--secondary" onclick="removeAllowedLink(${link.id})" style="padding: 4px 8px; font-size: 11px; margin-left: 8px; flex-shrink: 0;">✕</button>
+    </div>
+  `
+    )
+    .join("");
+  
+  updateWhitelistPanelAppearance();
+}
+
+function toggleWhitelist() {
+  browserState.whitelistActive = !browserState.whitelistActive;
+  updateWhitelistPanelAppearance();
+}
+
+function updateWhitelistPanelAppearance() {
+  const toggle = document.getElementById("whitelistToggle");
+  const newLinkInput = document.getElementById("newLinkInput");
+  const addLinkBtn = Array.from(document.querySelectorAll("#whitelistPanel .btn--primary")).find(btn => btn.textContent.includes("Add Link"));
+  const linksList = document.getElementById("allowedLinksList");
+  const removeButtons = document.querySelectorAll("#allowedLinksList .btn--secondary");
+  
+  if (browserState.whitelistActive) {
+    // Active state - normal appearance, everything enabled
+    if (newLinkInput) {
+      newLinkInput.style.opacity = "1";
+      newLinkInput.disabled = false;
+    }
+    if (addLinkBtn) {
+      addLinkBtn.style.opacity = "1";
+      addLinkBtn.disabled = false;
+    }
+    if (linksList) {
+      linksList.style.opacity = "1";
+    }
+    removeButtons.forEach(btn => {
+      btn.style.opacity = "1";
+      btn.disabled = false;
+    });
+    toggle.textContent = "Active";
+    toggle.classList.remove("btn--secondary");
+    toggle.classList.add("btn--primary");
+  } else {
+    // Inactive state - grayed out, can still add/manage links
+    if (newLinkInput) {
+      newLinkInput.style.opacity = "0.6";
+      newLinkInput.disabled = false;
+    }
+    if (addLinkBtn) {
+      addLinkBtn.style.opacity = "0.6";
+      addLinkBtn.disabled = false;
+    }
+    if (linksList) {
+      linksList.style.opacity = "0.6";
+    }
+    removeButtons.forEach(btn => {
+      btn.style.opacity = "0.6";
+      btn.disabled = false;
+    });
+    toggle.textContent = "Inactive";
+    toggle.classList.remove("btn--primary");
+    toggle.classList.add("btn--secondary");
   }
 }
 

@@ -257,29 +257,52 @@
           <h2>🌐 Browser</h2>
         </div>
 
-        <!-- Browser Interface -->
-        <div id="browserInterface" class="browser-interface" style="display: flex;">
-          <!-- Navigation Bar -->
-          <div class="browser-nav-bar">
-            <div class="browser-brand" id="browserBrand">
-              <span id="browserBrandIcon">🦆</span>
-              <span id="browserBrandName">Web Browser</span>
+        <div style="display: flex; gap: var(--space-24);">
+          <!-- Browser Interface (Left) -->
+          <div id="browserInterface" class="browser-interface" style="display: flex; flex: 1;">
+            <!-- Navigation Bar -->
+            <div class="browser-nav-bar">
+              <div class="browser-brand" id="browserBrand">
+                <span id="browserBrandIcon">🦆</span>
+                <span id="browserBrandName">Web Browser</span>
+              </div>
+              <button class="browser-nav-btn" onclick="browserGoBack()" title="Back">←</button>
+              <button class="browser-nav-btn" onclick="browserGoForward()" title="Forward">→</button>
+              <button class="browser-nav-btn" onclick="browserRefresh()" title="Refresh">⟲</button>
+              <input type="text" id="browserAddressBar" class="browser-address-bar" placeholder="Enter search term (e.g., Wikipedia, Python tutorial)..." onkeypress="handleAddressBarEnter(event)">
+              <button class="btn btn--primary" onclick="browserNavigate()" style="padding: 8px 24px;">Search</button>
             </div>
-            <button class="browser-nav-btn" onclick="browserGoBack()" title="Back">←</button>
-            <button class="browser-nav-btn" onclick="browserGoForward()" title="Forward">→</button>
-            <button class="browser-nav-btn" onclick="browserRefresh()" title="Refresh">⟲</button>
-            <input type="text" id="browserAddressBar" class="browser-address-bar" placeholder="Enter search term (e.g., Wikipedia, Python tutorial)..." onkeypress="handleAddressBarEnter(event)">
-            <button class="btn btn--primary" onclick="browserNavigate()" style="padding: 8px 24px;">Search</button>
+
+            <!-- Tab Bar -->
+            <div class="browser-tab-bar" id="browserTabBar">
+              <!-- Tabs will be rendered here dynamically -->
+            </div>
+
+            <!-- Content Area -->
+            <div id="browserContentArea" class="browser-content-area">
+              <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--color-text-secondary);">Enter a search term to get started...</div>
+            </div>
           </div>
 
-          <!-- Tab Bar -->
-          <div class="browser-tab-bar" id="browserTabBar">
-            <!-- Tabs will be rendered here dynamically -->
-          </div>
-
-          <!-- Content Area -->
-          <div id="browserContentArea" class="browser-content-area">
-            <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--color-text-secondary);">Enter a search term to get started...</div>
+          <!-- Link Whitelist Panel (Right) -->
+          <div id="whitelistPanel" style="width: 280px; flex-shrink: 0; background-color: var(--color-surface); border: 1px solid var(--color-card-border); border-radius: var(--radius-lg); padding: var(--space-16); display: flex; flex-direction: column; max-height: 600px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-12);">
+              <h3 style="margin: 0; font-size: var(--font-size-lg); color: var(--color-text);">🔒 Allowed Links</h3>
+              <button id="whitelistToggle" class="btn btn--primary" onclick="toggleWhitelist()" style="padding: 4px 12px; font-size: 12px; position: relative; z-index: 10;" title="Toggle whitelist restriction">Inactive</button>
+            </div>
+            <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-12);">Add links to create a whitelist</p>
+            
+            <!-- Add Link Form -->
+            <div style="margin-bottom: var(--space-16); display: flex; flex-direction: column; gap: var(--space-8);">
+              <input type="text" id="newLinkInput" class="form-control" placeholder="e.g., Wikipedia, Python Docs" style="font-size: var(--font-size-sm);">
+              <button class="btn btn--primary" onclick="addAllowedLink()" style="padding: 8px 12px; font-size: var(--font-size-sm);">+ Add Link</button>
+            </div>
+            
+            <!-- Links List -->
+            <div style="flex: 1; overflow-y: auto; border-top: 1px solid var(--color-card-border); padding-top: var(--space-12);">
+              <div id="allowedLinksList" style="display: flex; flex-direction: column; gap: var(--space-8);"></div>
+              <div id="emptyLinksState" style="text-align: center; color: var(--color-text-secondary); font-size: var(--font-size-sm); padding: var(--space-16) 0;">No links added yet</div>
+            </div>
           </div>
         </div>
       </div>
