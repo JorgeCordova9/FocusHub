@@ -9,6 +9,10 @@ let uiState = {
 let appData = {
   tasks: [],
   copiedCitation: null,
+  auth: {
+    isLoggedIn: false,
+    currentUser: null,
+  },
   focusStats: {
     sessionsToday: 0,
     totalTime: 0,
@@ -105,8 +109,13 @@ window.addEventListener("DOMContentLoaded", () => {
   // Start on task dashboard (no browser visible)
   switchModule("tasks");
 
-  // Show welcome modal
-  document.getElementById("welcomeModal").style.display = "flex";
+  // Show welcome modal only if not logged in
+  if (!appData.auth.isLoggedIn) {
+    document.getElementById("welcomeModal").style.display = "flex";
+  } else {
+    // Show logout button if already logged in
+    document.getElementById("logoutBtn").style.display = "block";
+  }
 
   // Add keyboard listener for deleting images
   document.addEventListener("keydown", (e) => {
@@ -176,6 +185,142 @@ function toggleSidebar() {
 
 function closeWelcome() {
   document.getElementById("welcomeModal").style.display = "none";
+}
+
+// ===== AUTHENTICATION FUNCTIONS =====
+function openLoginModal() {
+  document.getElementById("welcomeModal").style.display = "none";
+  document.getElementById("loginModal").style.display = "flex";
+  // Reset forms
+  document.getElementById("loginFormContainer").style.display = "block";
+  document.getElementById("signupFormContainer").style.display = "none";
+  document.getElementById("loginEmail").value = "";
+  document.getElementById("loginPassword").value = "";
+}
+
+function switchToSignup() {
+  document.getElementById("loginFormContainer").style.display = "none";
+  document.getElementById("signupFormContainer").style.display = "block";
+  document.getElementById("signupEmail").value = "";
+  document.getElementById("signupPassword").value = "";
+  document.getElementById("signupConfirmPassword").value = "";
+}
+
+function switchToLogin() {
+  document.getElementById("loginFormContainer").style.display = "block";
+  document.getElementById("signupFormContainer").style.display = "none";
+  document.getElementById("loginEmail").value = "";
+  document.getElementById("loginPassword").value = "";
+}
+
+function handleLogin(event) {
+  event.preventDefault();
+  const email = document.getElementById("loginEmail").value;
+  const password = document.getElementById("loginPassword").value;
+
+  // Validation
+  if (!email || !password) {
+    showNotification("❌ Please fill in all fields");
+    return;
+  }
+
+  if (password.length < 6) {
+    showNotification("❌ Password must be at least 6 characters");
+    return;
+  }
+
+  // Simulate successful login
+  appData.auth.isLoggedIn = true;
+  appData.auth.currentUser = {
+    email: email,
+    loginTime: new Date().toLocaleString(),
+  };
+
+  // Update UI
+  document.getElementById("logoutBtn").style.display = "block";
+  document.getElementById("loginModal").style.display = "none";
+  updateUserDisplay();
+  
+  showNotification(`✓ Welcome back, ${email}!`);
+  renderTaskDashboard();
+}
+
+function handleSignup(event) {
+  event.preventDefault();
+  const email = document.getElementById("signupEmail").value;
+  const password = document.getElementById("signupPassword").value;
+  const confirmPassword = document.getElementById("signupConfirmPassword").value;
+
+  // Validation
+  if (!email || !password || !confirmPassword) {
+    showNotification("❌ Please fill in all fields");
+    return;
+  }
+
+  if (password.length < 6) {
+    showNotification("❌ Password must be at least 6 characters");
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    showNotification("❌ Passwords do not match");
+    return;
+  }
+
+  // Email validation (basic)
+  if (!email.includes("@")) {
+    showNotification("❌ Please enter a valid email address");
+    return;
+  }
+
+  // Simulate successful signup
+  appData.auth.isLoggedIn = true;
+  appData.auth.currentUser = {
+    email: email,
+    loginTime: new Date().toLocaleString(),
+  };
+
+  // Update UI
+  document.getElementById("logoutBtn").style.display = "block";
+  document.getElementById("loginModal").style.display = "none";
+  updateUserDisplay();
+  
+  showNotification(`✓ Account created! Welcome to FocusHub, ${email}!`);
+  renderTaskDashboard();
+}
+
+function logout() {
+  // Confirm logout
+  if (confirm("Are you sure you want to log out?")) {
+    appData.auth.isLoggedIn = false;
+    appData.auth.currentUser = null;
+    appData.tasks = [];
+    appData.focusStats = {
+      sessionsToday: 0,
+      totalTime: 0,
+      currentStreak: 0,
+    };
+    appData.dailyGoal = {
+      targetMinutes: 60,
+      completedMinutes: 0,
+    };
+
+    document.getElementById("logoutBtn").style.display = "none";
+    document.getElementById("currentTaskDisplay").textContent = "Task Dashboard";
+    document.getElementById("welcomeModal").style.display = "flex";
+    
+    showNotification("✓ You have been logged out");
+  }
+}
+
+function updateUserDisplay() {
+  if (appData.auth.isLoggedIn && appData.auth.currentUser) {
+    const email = appData.auth.currentUser.email;
+    const emailName = email.split("@")[0];
+    document.getElementById("currentTaskDisplay").textContent = `👤 ${emailName}`;
+  } else {
+    document.getElementById("currentTaskDisplay").textContent = "Task Dashboard";
+  }
 }
 
 // ===== THEME TOGGLE FUNCTIONS =====

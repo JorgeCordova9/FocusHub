@@ -11,6 +11,7 @@
   <div class="top-bar">
     <div class="top-bar-left">
       <h1 class="app-title" onclick="logoClickHandler()" title="Click to return to dashboard">FocusHub</h1>
+      <button id="logoutBtn" class="logout-btn" onclick="logout()" title="Log out" style="display: none;">🚪 Logout</button>
       <span class="current-task" id="currentTaskDisplay">Task Dashboard</span>
     </div>
     
@@ -499,7 +500,59 @@
         <li><strong>Pomodoro Timer:</strong> Click the timer to customize and track your focus sessions</li>
       </ul>
       <p class="warning">💡 Tip: Start by creating your first task and explore the focused workspace!</p>
-      <button class="btn btn--primary" onclick="closeWelcome()">Get Started</button>
+      <button class="btn btn--primary" onclick="openLoginModal()">Get Started</button>
+    </div>
+  </div>
+
+  <!-- Login/Signup Modal -->
+  <div id="loginModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 400px;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h2 style="margin-bottom: 8px;">Welcome to FocusHub</h2>
+        <p style="color: var(--color-text-secondary);">Sign in or create an account</p>
+      </div>
+
+      <!-- Login Form -->
+      <div id="loginFormContainer" style="display: block;">
+        <form onsubmit="handleLogin(event)" style="display: flex; flex-direction: column; gap: 16px;">
+          <div>
+            <label class="form-label">Email</label>
+            <input type="email" id="loginEmail" class="form-control" placeholder="your@email.com" required>
+          </div>
+          <div>
+            <label class="form-label">Password</label>
+            <input type="password" id="loginPassword" class="form-control" placeholder="Enter password" required>
+          </div>
+          <button type="submit" class="btn btn--primary" style="width: 100%;">Sign In</button>
+        </form>
+        <div style="text-align: center; margin-top: 16px; border-top: 1px solid var(--color-border); padding-top: 16px;">
+          <p style="color: var(--color-text-secondary); margin-bottom: 8px;">Don't have an account?</p>
+          <button type="button" class="btn btn--secondary" onclick="switchToSignup()" style="width: 100%;">Create Account</button>
+        </div>
+      </div>
+
+      <!-- Signup Form -->
+      <div id="signupFormContainer" style="display: none;">
+        <form onsubmit="handleSignup(event)" style="display: flex; flex-direction: column; gap: 16px;">
+          <div>
+            <label class="form-label">Email</label>
+            <input type="email" id="signupEmail" class="form-control" placeholder="your@email.com" required>
+          </div>
+          <div>
+            <label class="form-label">Password</label>
+            <input type="password" id="signupPassword" class="form-control" placeholder="Create a password" required>
+          </div>
+          <div>
+            <label class="form-label">Confirm Password</label>
+            <input type="password" id="signupConfirmPassword" class="form-control" placeholder="Confirm password" required>
+          </div>
+          <button type="submit" class="btn btn--primary" style="width: 100%;">Create Account</button>
+        </form>
+        <div style="text-align: center; margin-top: 16px; border-top: 1px solid var(--color-border); padding-top: 16px;">
+          <p style="color: var(--color-text-secondary); margin-bottom: 8px;">Already have an account?</p>
+          <button type="button" class="btn btn--secondary" onclick="switchToLogin()" style="width: 100%;">Sign In</button>
+        </div>
+      </div>
     </div>
   </div>
 
