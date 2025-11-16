@@ -2067,10 +2067,10 @@ function renderTaskDashboard() {
       }m</span>
             ${
               !isCompleted
-                ? `<span style="margin-left: auto;">Remaining: ${Math.round(
+                ? `<span style="margin-left: 16px;">Remaining: ${Math.round(
                     timeRemaining
                   )}m</span>`
-                : `<span style="margin-left: auto; color: #00aa00;">Time Used: ${Math.round(
+                : `<span style="margin-left: 16px; color: #00aa00;">Time Used: ${Math.round(
                     task.timeSpent
                   )}m</span>`
             }
@@ -2094,6 +2094,13 @@ function renderTaskDashboard() {
                 : "Start →"
             }
           </button>
+          ${
+            !isCompleted
+              ? `<button class="btn btn--secondary" onclick="event.stopPropagation(); completeTaskFromDashboard(${task.id})" title="Mark as completed">
+              ✓
+            </button>`
+              : ""
+          }
           <button class="btn btn--secondary" onclick="event.stopPropagation(); deleteTask(${
             task.id
           })" title="Delete">
@@ -2176,6 +2183,26 @@ function deleteTask(id) {
     renderTaskDashboard();
     showNotification("Task deleted");
   }
+}
+
+function completeTaskFromDashboard(id) {
+  const task = appData.tasks.find((t) => t.id === id);
+  if (!task) return;
+
+  task.status = "completed";
+  
+  // Update stats
+  appData.focusStats.sessionsToday++;
+  appData.focusStats.currentStreak++;
+  appData.focusStats.totalTime += Math.floor(task.timeAllocated);
+  updateFocusStats();
+
+  // Update daily goal progress
+  appData.dailyGoal.completedMinutes += Math.floor(task.timeSpent);
+  updateDailyGoalDisplay();
+
+  renderTaskDashboard();
+  showNotification("✓ Task marked as completed");
 }
 
 function enterTaskWorkspace(taskId) {
@@ -2321,11 +2348,19 @@ function startWorkingOnTask() {
     .querySelectorAll("#workspaceSidebar .nav-btn")
     .forEach((b) => b.classList.remove("active"));
 
-  document.getElementById("browserModule").classList.add("active");
+  // Explicitly show browser module
+  const browserModule = document.getElementById("browserModule");
+  if (browserModule) {
+    browserModule.classList.add("active");
+  }
+  
+  // Mark browser button as active
   const browserBtn = document.querySelector(
     '#workspaceSidebar .nav-btn[onclick*="browser"]'
   );
-  if (browserBtn) browserBtn.classList.add("active");
+  if (browserBtn) {
+    browserBtn.classList.add("active");
+  }
 
   initializeBrowser();
 
