@@ -605,6 +605,7 @@
               <!-- Tabs will be rendered here dynamically -->
             </div>
 
+<<<<<<< user-interface
             <!-- Content Area -->
             <div id="browserContentArea" class="browser-content-area">
               <div
@@ -619,6 +620,18 @@
                 Enter a search term to get started...
               </div>
             </div>
+=======
+      <!-- Notes Module -->
+      <div id="notesModule" class="module">
+        <div class="module-header">
+          <h2>📝 Note Editor</h2>
+          <div class="notes-controls">
+            <button class="btn btn--primary" onclick="createNewNote()">New Note</button>
+            <button class="btn btn--secondary" onclick="saveCurrentNote()">Save</button>
+            <button class="btn btn--secondary" onclick="deleteCurrentNote()">Delete</button>
+            <button class="btn btn--secondary" onclick="document.getElementById('pdfFileInput').click()" title="Import PDF from computer">📄 Import PDF</button>
+            <input type="file" id="pdfFileInput" accept=".pdf" style="display: none;" onchange="handlePdfImport(event)">
+>>>>>>> main
           </div>
         </div>
 
@@ -904,10 +917,22 @@
                   </button>
                 </div>
               </div>
+<<<<<<< user-interface
 
               <!-- Canvas -->
               <div class="whiteboard-canvas-wrapper">
                 <canvas id="whiteboard" width="1200" height="600"></canvas>
+=======
+              
+              <div class="tool-divider"></div>
+              
+              <!-- Actions -->
+              <div class="tool-group">
+                <button class="btn btn--primary btn--sm" onclick="saveDiagram()">💾 Save</button>
+                <button class="btn btn--secondary btn--sm" onclick="exportCanvas()">⬇️ Export</button>
+                <button class="btn btn--secondary btn--sm" onclick="document.getElementById('pngFileInput').click()" title="Import PNG image">🖼️ Import Image</button>
+                <input type="file" id="pngFileInput" accept=".png,.jpg,.jpeg,.webp" style="display: none;" onchange="handlePngImport(event)">
+>>>>>>> main
               </div>
             </div>
 
@@ -1165,6 +1190,17 @@
       </div>
     </div>
 
+<<<<<<< user-interface
     <script src="app.js"></script>
   </body>
 </html>
+=======
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    // Set worker for PDF.js
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>
+>>>>>>> main
